@@ -19,11 +19,14 @@ Where [[clawbot]] sits, and — more usefully — what it is **not** allowed to 
 |---|---|
 | [[openpartscore]] | what a part *is* — cited reference data |
 | [[openbuildcore]] | what you *have*, and what you could make of it |
-| OpenCircuitCore | the electronics of the thing you decided to build — **not yet read** |
+| [[opencircuitcore]] | the electronics of the thing you decided to build — and the controller a harness lands on |
 | [[opendesigncore]] | the geometry, validated and provenance-carrying |
 | [[clawbot]] | the mechanism — links, joints, actuators, and what they can reach |
 
-[[oh-ben-claw]] sits outside this set: it is the runtime that *commands* a robot, and a likely consumer.
+[[oh-ben-claw]] sits outside this set: it is the runtime that *commands* a robot, and a likely
+consumer. So do [[clawcam]], the perception peer, and [[project-bingo]], which settles payment
+for fabrication and owns two vocabularies the Open\*Core repos borrow — the machine record and
+the PD-5 refusal taxonomy.
 
 ## The seam
 

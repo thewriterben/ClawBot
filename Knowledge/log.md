@@ -496,3 +496,58 @@ closed as *refusals* — self-collision, workspace volume, efficiency-for-static
 answered by establishing that the thing should not be done is answered. The next questions will
 arrive the way ADR-0014 and ADR-0018 both did: from one datasheet meeting one schema field, not
 from thinking harder.
+
+---
+
+## [2026-08-22] ingest | Paying the entity-page debt, and finding PD-5 was already unblocked
+
+Three entity pages — [[opencircuitcore]], [[clawcam]], [[project-bingo]] — for three peers read
+during the opening platform survey and never written up. The index had been claiming they were
+unread, which was false in one direction and the debt was real in the other.
+
+**The failure is worth keeping rather than deleting.** This wiki's ingest rule says a source that
+touches pages updates them **in the same pass**. That did not happen, across two sessions. The
+knowledge did not vanish — it went into ADRs and commit messages — but a wiki exists precisely to
+stop knowledge living there, where nobody looking for "what does OpenCircuitCore do" will find
+it.
+
+**Writing them up surfaced things that were not obvious while reading.**
+
+[[opencircuitcore]] is the origin of an invariant this repo inherited. Its ADR-0001 chose atopile
+and its ADR-0003 dropped it **the same day**, on evidence — that is PD-1, and it is where
+[[inherited-invariants]] #8 comes from. Two of its decisions also parallel ClawBot's without
+either repo knowing: *"a custom DRC rule ships only once it has been proven to fire"* is exactly
+what 31 negative tests are for, and *"the MCP surface inspects and verifies, it does not
+regenerate"* is the neighbour of ADR-0016. Three repos converged on reads-execute /
+effects-ask — [[clawcam]] runs the fully populated version with 35 auto-approved read tools and
+11 gated write tools, while ClawBot's is degenerate because its propose side is empty.
+
+**And PD-5 turned out to be unblocked already.** [[project-bingo]]'s
+`v3/specs/REFUSAL-CATEGORIES.md` is the taxonomy that platform decision assigns to it, and it
+names design-time assistants explicitly — [[opendesigncore]], OpenCircuitCore, deployment tools.
+ClawBot is absent only because it did not exist when the spec was written.
+
+Two of the nine categories land squarely here: `weapons.other`, and `regulated.medical`, which
+explicitly covers **load-bearing prosthetics**. A prosthetic limb is a mechanism, and it is the
+most likely thing anybody would describe with this schema that carries a policy category at all.
+
+**One mechanic cuts directly against this repo's grain**, and that is the interesting part. In
+BINGO, an asset manifest with no `policy_categories` means `none` **as a declaration**, carrying
+the same fraud consequences as misdeclaring a licence. Everywhere in ClawBot, absent means
+*unknown*. Both are right in their own frame — a declaration is a claim somebody makes, an absent
+measurement is one nobody took — and a ClawBot position has to choose deliberately and say why.
+Question 5 is rewritten to name the three things that actually need deciding rather than "read
+the spec".
+
+**Also corrected:** [[ecosystem-position]]'s peer table still said OpenCircuitCore was "not yet
+read", and listed only [[oh-ben-claw]] as sitting outside the five. [[clawcam]] and
+[[project-bingo]] sit outside it too, and BINGO owns two vocabularies the Open\*Core repos borrow
+— the machine record that [[openbuildcore]]'s schema copies field-for-field, and the refusal
+taxonomy.
+
+**One line worth recording for what it is not.** BINGO's README marks its own seams honestly, and
+among the stand-ins is "the perception/reach work still spec-only". That is the closest thing in
+the whole ecosystem to a request for what ClawBot does, and it is **not one** — it is BINGO
+describing its own unbuilt half, in its own domain. ADR-0001's admission that nobody has asked
+for this repo still stands, and finding a phrase that could be read as demand is exactly when to
+check whether it is.

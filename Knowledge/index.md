@@ -14,8 +14,12 @@ Catalogue of every page in this wiki. Read this first when answering a question,
 - [[opendesigncore]] — the provenance record, the platform decisions, and the wiki pattern this one matches
 - [[openpartscore]] — the canonical parts registry. Its `electronic/sg90` proved the actuator boundary: identity, bus and capabilities upstream; torque, speed and travel here
 - [[oh-ben-claw]] — the embodied runtime; likely consumer, confirmed to have no robot model of its own
+- [[opencircuitcore]] — the electronics peer; KiCad scripted, and the repo whose four-hour atopile mistake became inherited invariant #8
+- [[clawcam]] — the perception peer; 35 read tools auto-approved, 11 write tools gated — the approval split ADR-0016 reinvented
+- [[project-bingo]] — the settlement peer; owns the machine record vocabulary OpenBuildCore copies, and the PD-5 refusal taxonomy
 
-**Read on 2026-08-22 but not written up**: OpenCircuitCore, ClawCam, Project BINGO. An outstanding debt against this wiki's own ingest rule — what was learned is held in ADRs and commit messages instead of entity pages. Recorded in [[open-questions]].
+All eight repos read during the platform survey now have entity pages. The debt recorded on
+2026-08-22 — three peers read and never written up — is paid.
 
 ## Sources
 
@@ -53,7 +57,7 @@ came from a single datasheet meeting a single schema field, not from thinking ha
 
 ## Counts
 
-4 concepts, 5 entities, 10 source summaries, 6 log entries. One real record in `data/`, cited to a vendor manual. 1 raw source copied locally; the rest cited by
+4 concepts, 8 entities, 10 source summaries, 7 log entries. One real record in `data/`, cited to a vendor manual. 1 raw source copied locally; the rest cited by
 repo-relative path or by URL with a retrieval date.
 
 Evidence quality is not uniform and the pages say so individually. The URDF pages rest on a

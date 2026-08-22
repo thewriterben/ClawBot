@@ -85,9 +85,32 @@ half-answers by reporting uncatalogued parts separately rather than dropping the
 
 The `_rad` suffix plus a bounded range is the stated defence against a hand-typed `90`. Nothing has tested whether that defence holds for a value like `3` — plausibly 3 radians, plausibly a typo for 30 degrees, in range either way.
 
-### 5. PD-5 legality gating has no ClawBot position
+### 5. PD-5 legality gating has no ClawBot position — **unblocked, still undecided**
 
-A mechanism repo needs one more obviously than a parts registry does. Requires reading Project BINGO's acceptance schema, which owns the taxonomy.
+A mechanism repo needs one more obviously than a parts registry does.
+
+**The reading is done.** [[project-bingo]] owns the taxonomy in `v3/specs/REFUSAL-CATEGORIES.md`
+(v0.1, marked DRAFT). Legality gating is two-tier — design-time refusal at the assistants,
+fabrication-time refusal at the nodes — and the spec names design-time assistants explicitly:
+[[opendesigncore]], OpenCircuitCore and deployment tools. ClawBot is not named only because it
+did not exist when the spec was written.
+
+**Two of the nine categories land here.** `weapons.other` (items designed as weapons that are not
+firearms; default stance refuse network-wide) and `regulated.medical` (which explicitly includes
+**load-bearing prosthetics**; refuse unless a node opts in with declared certification context).
+A prosthetic limb is a mechanism, and it is the most likely thing anyone would describe with this
+schema that carries a category at all.
+
+**One mechanic cuts against this repo's grain and needs deciding on purpose.** In BINGO, an asset
+manifest with no `policy_categories` means `none` **as a declaration**, carrying the same fraud
+consequences as misdeclaring a licence. Everywhere in ClawBot, absent means *unknown*. Both are
+right in their own frame — a declaration is a claim somebody makes, an absent measurement is one
+nobody took — and a ClawBot position has to say which it is adopting and why.
+
+**What remains is a decision, not more reading.** Specifically: whether a `policy_categories`
+field appears on a robot record at all; whether absent means `none`-as-declared or unknown; and
+whether ClawBot refuses to *compute* over a declared-refused mechanism or merely records the
+declaration and lets consumers route on it.
 
 ---
 
@@ -95,25 +118,16 @@ A mechanism repo needs one more obviously than a parts registry does. Requires r
 
 `raw/robotics/` was empty and so was every domain page. Six sources were ingested on 2026-08-22 and **all eight sourcing topics are now closed**. The rule that emptied the directory has not stopped applying: nothing here is built on recall, and a new page still waits for a source.
 
-### Read but not written up — an outstanding debt
+### Read but not written up — **PAID 2026-08-22**
 
-**OpenCircuitCore, ClawCam and Project BINGO were read on 2026-08-22** during the platform survey
-that opened this work. None of them has an entity page, and the index still says they are
-unread. That is a real gap in this wiki's own bookkeeping and is recorded here rather than
-quietly corrected, because the wiki's ingest rule says a source that touches pages should update
-them in the same pass.
+OpenCircuitCore, ClawCam and Project BINGO were read during the opening platform survey and had
+no entity pages, while the index claimed they were unread. Both halves are fixed:
+[[opencircuitcore]], [[clawcam]] and [[project-bingo]] now exist.
 
-What was learned and is currently held only in commit messages and ADRs:
-
-- **Project BINGO** owns the PD-5 refusal taxonomy in `v3/specs/REFUSAL-CATEGORIES.md`, and two of
-  its categories land directly on a mechanism repo — `weapons.other` (refuse network-wide) and
-  `regulated.medical` (load-bearing prosthetics). It names design-time assistants as bound by the
-  same vocabulary. This is what question 5 below needs.
-- **OpenCircuitCore** is KiCad-direct with netlist-as-source, and emits provenance per build. Its
-  `pcb export step|stl` is the board→enclosure path. An arm's wiring is a real constraint on its
-  joint travel (ADR-0012), so the two repos touch more than expected.
-- **ClawCam** is the perception peer, with a read-free / write-gated MCP approval model that
-  ADR-0016 arrived at independently.
+The debt is recorded rather than deleted because the failure is worth remembering: the wiki's own
+ingest rule says a source that touches pages updates them **in the same pass**, and this one did
+not, across two separate sessions. An ingest that stops at "I have read it" leaves the knowledge
+in commit messages, which is exactly where a wiki exists to stop it living.
 
 ### Still on disk, not yet read
 
