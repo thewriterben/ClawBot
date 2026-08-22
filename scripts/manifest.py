@@ -117,6 +117,76 @@ def build_manifest(robot: dict, assembly: dict | None, harness: dict | None) -> 
     }
 
 
+# A DATED COPY of Project BINGO's default stances, taken from
+# ProjectBINGO/v3/specs/REFUSAL-CATEGORIES.md v0.1 on 2026-08-22. This is a cache
+# with provenance, not a fork: it never overrides BINGO, it always names its
+# upstream, and it decides one thing only — whether ClawBot emits a document.
+# BINGO re-checks at matching time against the version frozen into the job.
+# It WILL go stale. That is bounded: a stale copy makes this repo slightly over-
+# or under-cautious about emitting, and never makes a routing decision (ADR-0019).
+BINGO_TAXONOMY_VERSION_SEEN = "REFUSAL-CATEGORIES v0.1 (draft), read 2026-08-22"
+REFUSED_NETWORK_WIDE = {
+    "weapons.firearms",
+    "weapons.other",
+    "covert.surveillance",
+    "ip.counterfeit",
+}
+
+
+class PolicyRefusal(Exception):
+    """Raised at the output boundary, never during a derivation."""
+
+
+def check_policy(robot: dict) -> list[str]:
+    """Gate on the fabrication-bound path only. Returns advisory notes, or raises.
+
+    ADR-0019: ClawBot will not make a declaration on the author's behalf, and will
+    not emit a document that has no valid destination.
+    """
+    policy = robot.get("policy")
+    if not policy:
+        raise PolicyRefusal(
+            "this record carries no `policy` declaration, and an OpenBuildCore project "
+            "is bound for a network that requires one. Project BINGO reads an absent "
+            "declaration AS a 'none' declaration, carrying the same fraud consequences "
+            "as misdeclaring a licence — so emitting this would make that declaration "
+            "on your behalf, invisibly, at the far end (ADR-0019).\n\n"
+            "  Declare it: policy.categories (e.g. [\"none\"]) and "
+            "policy.taxonomy_version.\n"
+            "  The plain bill of parts is ungated and needs no declaration; it is a "
+            "shopping list for a person, not a document bound for a network."
+        )
+
+    declared = [c for c in policy.get("categories", [])]
+    refused = sorted(set(declared) & REFUSED_NETWORK_WIDE)
+    if refused:
+        raise PolicyRefusal(
+            f"this record declares {', '.join(refused)}, which Project BINGO's taxonomy "
+            f"marks refuse-network-wide.\n\n"
+            f"  ClawBot is not adjudicating that. It is declining to emit a "
+            f"fabrication-bound document with no valid destination: no node can accept "
+            f"such a job under any configuration.\n"
+            f"  Judged against a dated copy of {BINGO_TAXONOMY_VERSION_SEEN}. "
+            f"BINGO is authoritative and re-checks at matching time.\n"
+            f"  Every derivation still runs — fk, reach, hold and can_it do not consult "
+            f"this field (ADR-0019)."
+        )
+
+    notes = []
+    opt_in = sorted(set(declared) - {"none"})
+    if opt_in:
+        notes.append(
+            f"declares {', '.join(opt_in)} against {policy['taxonomy_version']}. Not "
+            f"refused: these route only to nodes that have opted in, with whatever "
+            f"context the category requires. The declaration travels with the manifest.")
+    if policy.get("taxonomy_version") != BINGO_TAXONOMY_VERSION_SEEN and declared != ["none"]:
+        notes.append(
+            f"declared against '{policy['taxonomy_version']}'; the stance copy used here "
+            f"is {BINGO_TAXONOMY_VERSION_SEEN}. If those differ, BINGO's list at order "
+            f"time is what counts.")
+    return notes
+
+
 def as_project(robot: dict, manifest: dict) -> dict:
     """An OpenBuildCore project document. Its own validator is the judge."""
     requires = [dict(r) for r in manifest["buy"]]
@@ -124,6 +194,14 @@ def as_project(robot: dict, manifest: dict) -> dict:
         requires.append(dict(m))
     name = " ".join(filter(None, [robot.get("make"), robot.get("model")])) \
         or robot.get("robot_id", "robot")
+
+    # OpenBuildCore's project schema is additionalProperties:false and has no slot
+    # for a policy declaration, so the declaration CANNOT travel as data through
+    # this format. Carrying it as prose in `description` is the only channel that
+    # exists and it is not machine-readable. Reported as a gap rather than
+    # smuggled: see the note manifest.py prints alongside (ADR-0019).
+    policy = robot.get("policy") or {}
+    declared = ", ".join(policy.get("categories", [])) or "undeclared"
     return {
         "schema_version": 0,
         "id": robot["robot_id"],
@@ -133,7 +211,10 @@ def as_project(robot: dict, manifest: dict) -> dict:
             f"{len(robot.get('links', []))} link(s) and "
             f"{len(robot.get('joints', []))} joint(s). "
             f"Emitted from a ClawBot robot record by scripts/manifest.py; the "
-            f"mechanism's own definition stays in ClawBot."
+            f"mechanism's own definition stays in ClawBot. "
+            f"Policy categories declared: {declared} "
+            f"(against {policy.get('taxonomy_version', 'no version')}). "
+            f"Carried as prose because this schema has no field for it."
         ),
         "requires": requires,
     }
@@ -217,6 +298,19 @@ def main() -> int:
     manifest = build_manifest(robot, assembly, harness)
 
     if args.as_project:
+        try:
+            notes = check_policy(robot)
+        except PolicyRefusal as exc:
+            print(f"REFUSED: cannot emit an OpenBuildCore project for "
+                  f"'{args.robot_id}'.\n\n  {exc}", file=sys.stderr)
+            return 1
+        for note in notes:
+            print(f"note: {note}", file=sys.stderr)
+        print("note: OpenBuildCore's project schema is additionalProperties:false and "
+              "has no field for a policy declaration, so the declaration travels only "
+              "as PROSE in `description` and is not machine-readable downstream. That "
+              "is a gap worth reporting upstream, not a thing to smuggle (ADR-0019).",
+              file=sys.stderr)
         print(json.dumps(as_project(robot, manifest), indent=2))
     elif args.json:
         print(json.dumps(manifest, indent=2))

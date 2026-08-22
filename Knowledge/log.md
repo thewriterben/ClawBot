@@ -551,3 +551,75 @@ the whole ecosystem to a request for what ClawBot does, and it is **not one** �
 describing its own unbuilt half, in its own domain. ADR-0001's admission that nobody has asked
 for this repo still stands, and finding a phrase that could be read as demand is exactly when to
 check whether it is.
+
+---
+
+## [2026-08-22] build | PD-5, and two absence rules that are both right
+
+ClawBot's position on platform decision PD-5, which it has owed since the day it was created.
+The decision is ADR-0019 and it turned on a collision that looked like a contradiction and was
+not.
+
+**The collision.** Everywhere in this repo, absent means UNKNOWN. In [[project-bingo]], an asset
+manifest with no `policy_categories` means `none` **as a declaration**, carrying the same fraud
+consequences as misdeclaring a licence. Two peers, opposite rules, same word.
+
+**Both are right, because they govern different kinds of field, and noticing that was the whole
+decision.** This repo's absent-means-unknown covers **measurements** — a joint limit nobody
+sourced, a torque nobody published. Nobody can *declare* a joint limit; you measure it or you do
+not. A policy category is not a measurement. It is a **statement by the author about their own
+intent**, and the author always knows. There is no honest "I do not know whether this is a
+weapon".
+
+So the field's nature is BINGO's. What ClawBot refuses is to **supply** the declaration: absent
+stays undeclared, and is never converted to `none` at the boundary.
+
+**Why the field exists at all is mechanical, not moral.** `manifest.py` already emits into
+[[openbuildcore]]'s vocabulary, and OBC's machine records already mirror BINGO's field-for-field.
+There is a real path from a robot record to a fabrication job. So a manifest carrying no
+declaration is not neutral — it makes the `none` claim at the far end, invisibly. That is the
+invisible-choice failure ADR-0014 removed from torque lookup, in a place where the consequence is
+legal rather than thermal.
+
+**Where the refusal lives.** Not in the derivations. `fk`, `reach`, `hold` and `can_it` do not
+consult the policy field, because computing kinematics is not fabricating and the mathematics is
+in every textbook — a repo declining to multiply matrices would be theatre. The refusal is at the
+**output boundary**, the same place ADR-0007 put the URDF refusal: decline to emit the artifact a
+downstream system would act on.
+
+`manifest.py --as-project` therefore refuses twice — for an undeclared record, and for the four
+categories BINGO marks refuse-network-wide. The second is *not* ClawBot adjudicating: it is
+declining to produce a document with no valid destination, since no node can accept such a job
+under any configuration. The message says so, names the taxonomy version it judged against, and
+states that BINGO is authoritative.
+
+**The case to design against is a prosthetic, not a firearm.** `regulated.medical` explicitly
+covers load-bearing prosthetics and is **node-opt-in, not refused** — so a declared prosthetic
+emits normally and carries its category to a node that has opted in with certification context.
+The design is correct if it lets that person work while making the declaration explicit, and
+wrong if it treats every category as a prohibition. Checked with a test named for it.
+
+**Three refusals recorded, and the last is the one that matters most.** No `policy_categories`
+enum in the schema — that forks a taxonomy whose own spec says growth needs a spec revision, and
+a forked registry that drifts is the failure [[openpartscore]] exists to end. No inference of a
+category from geometry, link lengths or a name — a repo guessing "this looks like a weapon" from
+a bounding box would be manufacturing exactly the confident unfounded judgement the invariant
+refuses. And **no refusal to describe**: a notation that cannot express a thing does not prevent
+the thing, it prevents the thing being described accurately, and it would put this repo in the
+business of deciding what may be written down.
+
+**A gap found while implementing, worth reporting upstream.** [[openbuildcore]]'s project schema
+is `additionalProperties: false` and has **no field for a policy declaration**. So the
+declaration cannot travel as *data* through `--as-project` — it goes as prose in `description`
+and is not machine-readable downstream. The emitter prints that as a note rather than smuggling
+the field in, and the test that proves it also proves the emitted document still validates
+against OBC's real schema.
+
+**On the stance copy.** The four refuse-network-wide ids are held here as a **dated copy** of
+BINGO's defaults, cited to the spec version and marked as a copy. It will go stale. That is
+bounded on purpose: it decides only whether ClawBot emits a document, never whether a job is
+accepted, and BINGO re-checks at matching time against the list frozen into the job. A stale copy
+makes this repo slightly over- or under-cautious about emitting, and never makes a routing
+decision.
+
+The open question that has been sitting at number 5 since the repo was created is closed.

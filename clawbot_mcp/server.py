@@ -211,17 +211,36 @@ def bill_of_parts(robot_id: str, assembly_id: str = "", harness_id: str = "",
 
     Note `designed`: links that are OpenDesignCore artifact hashes are reported
     separately and NOT as `make` requirements, because ClawBot holds the hash and
-    not the bounding box. Judge those with OBC's `can-print --from-sidecar`."""
+    not the bounding box. Judge those with OBC's `can-print --from-sidecar`.
+
+    `as_project=True` is the fabrication-bound path and is **gated on a PD-5 policy
+    declaration** (ADR-0019). An undeclared record refuses, because emitting it
+    would make the `none` declaration on the author's behalf at the far end. The
+    plain bill of parts is ungated."""
     robot = _robot(robot_id)
     assembly = manifest_lib.load("assemblies", assembly_id, "assembly_id") \
         if assembly_id else None
     harness = manifest_lib.load("harnesses", harness_id, "harness_id") \
         if harness_id else None
     built = manifest_lib.build_manifest(robot, assembly, harness)
-    if as_project:
-        return {"manifest": built,
-                "openbuildcore_project": manifest_lib.as_project(robot, built)}
-    return built
+    if not as_project:
+        return built
+    try:
+        notes = manifest_lib.check_policy(robot)
+    except manifest_lib.PolicyRefusal as exc:
+        return {"verdict": "refused", "manifest": built, "detail": str(exc),
+                "note": ("the plain bill of parts is in `manifest` and is unaffected; "
+                         "what is refused is the fabrication-bound document")}
+    return {
+        "verdict": "emitted",
+        "manifest": built,
+        "openbuildcore_project": manifest_lib.as_project(robot, built),
+        "policy_notes": notes,
+        "declaration_is_prose_only": (
+            "OpenBuildCore's project schema is additionalProperties:false and has no "
+            "field for a policy declaration, so it travels only as prose in "
+            "`description` and is not machine-readable downstream (ADR-0019)"),
+    }
 
 
 @server.tool()

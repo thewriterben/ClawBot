@@ -61,6 +61,27 @@
         "additionalProperties": false
       }
     },
+    "policy": {
+      "type": ["object", "null"],
+      "description": "The author's declaration of policy categories under Project BINGO's shared taxonomy (platform decision PD-5, ClawBot ADR-0019). OPTIONAL, and absent means UNDECLARED — which ClawBot will not convert into 'none' on your behalf, because BINGO reads an absent declaration AS a 'none' declaration carrying fraud consequences. The consequence of leaving it absent is narrow and specific: manifest.py --as-project refuses to emit, because that document is bound for a network that requires a declaration. Every derivation - fk, reach, hold, can_it - runs regardless; computing kinematics is not fabricating, and a repo that refused to multiply matrices would be theatre. ClawBot NEVER INFERS a category from geometry, link lengths or a name; the declaration is the author's and only the author's.",
+      "required": ["categories", "taxonomy_version"],
+      "properties": {
+        "categories": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Category ids verbatim from BINGO's REFUSAL-CATEGORIES spec, e.g. 'none', 'regulated.medical', 'weapons.other'. Stored as strings and DELIBERATELY NOT validated against a hardcoded enum: that would fork a taxonomy whose own spec says growth requires a spec revision, and a forked registry that drifts is the failure OpenPartsCore exists to end. BINGO adjudicates; this repo carries the declaration faithfully."
+        },
+        "taxonomy_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "REQUIRED whenever categories are present. A category id without the version of the list it came from is a string whose meaning lives somewhere else - the same defect ADR-0005 rejects DH parameters for. BINGO freezes this file's hash into a job at order time; record whatever identifies the list you declared against."
+        },
+        "declared_by": { "type": "string", "description": "Who made this declaration. It is a claim a person makes, not a measurement, so it has an author rather than a method." },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "source": { "$ref": "#/$defs/source" },
     "note": {
       "type": "string",

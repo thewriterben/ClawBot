@@ -988,3 +988,110 @@ per-model, per-lubricant, per-ratio, and reading a value off a chart image is no
 right most of the time, which is what makes it dangerous — the cases where it is wrong are
 precisely the measured ones a user took trouble over, and silently relabelling those as
 population figures would discard the better evidence.
+
+---
+
+## ADR-0019 — ClawBot carries a policy declaration and refuses to make one on your behalf
+
+**Date:** 2026-08-22
+**Status:** accepted (ClawBot's position on platform decision PD-5)
+
+**Context.** PD-5 makes legality gating two-tier — design-time refusal at the assistants,
+fabrication-time refusal at the nodes — with [[project-bingo]] owning the shared taxonomy in
+`v3/specs/REFUSAL-CATEGORIES.md`. That spec names design-time assistants explicitly:
+OpenDesignCore, OpenCircuitCore, deployment tools. ClawBot is absent only because it did not
+exist when the spec was written.
+
+Two of the nine categories land squarely on a mechanism repo. **`weapons.other`** — items
+designed as weapons that are not firearms, default stance refuse network-wide. And
+**`regulated.medical`**, which explicitly covers **load-bearing prosthetics**. A prosthetic limb
+is a mechanism, and it is the most likely thing anybody would describe with this schema that
+carries a category at all.
+
+Three things needed deciding.
+
+### 1. Does a policy declaration belong on a robot record?
+
+Yes, and the argument is mechanical rather than moral. `manifest.py` already emits into
+OpenBuildCore's requirement vocabulary, and OpenBuildCore's machine records already mirror
+BINGO's field-for-field. **There is a path from a ClawBot robot record to a BINGO fabrication
+job.** BINGO reads an absent `policy_categories` as `none` **declared**. So a ClawBot manifest
+that carries no declaration is not neutral — it makes the `none` declaration on the author's
+behalf, invisibly, at the far end. That is the invisible-choice failure ADR-0014 removed from
+torque lookup, in a place where the consequence is legal rather than thermal.
+
+### 2. Absent means unknown here, or `none` as BINGO reads it?
+
+The collision. Everywhere in ClawBot, absent means UNKNOWN. In BINGO, absent means `none`
+**as a declaration**, carrying the same fraud consequences as misdeclaring a licence.
+
+**Both are right, because they are different kinds of field, and noticing that is the whole
+decision.** ClawBot's absent-means-unknown governs **measurements** — a joint limit nobody
+sourced, a torque nobody published. Nobody can *declare* a joint limit; you measure it or you do
+not. A policy category is not a measurement. It is a **statement by the author about their own
+intent**, and the author always knows. There is no honest "I do not know whether this is a
+weapon".
+
+So the field's nature is BINGO's, not this repo's. But ClawBot still refuses to *supply* the
+declaration. The resolution: **absent in the file means undeclared, and ClawBot will not convert
+undeclared into `none` at the boundary.** It declines to emit the fabrication-bound document
+instead.
+
+### 3. Refuse to compute, or record and let consumers route?
+
+**Compute always.** Forward kinematics on a mechanism is not fabrication, the mathematics is in
+every textbook, and a repo refusing to multiply matrices would be theatre. BINGO's own spec is
+careful about this: it is "not a compliance oracle, not legal advice".
+
+The actionable refusal is at the **output boundary**, which is the same place ADR-0007 put the
+URDF refusal: decline to emit the artifact that a downstream system would act on.
+
+**Decision.**
+
+- A robot record may carry `policy`: a list of `categories`, the `taxonomy_version` they were
+  declared against, and who declared them. **Categories are stored verbatim and never validated
+  against a hardcoded list** — that would fork BINGO's taxonomy and drift, which is the failure
+  [[openpartscore]] exists to end. `taxonomy_version` is **required** whenever categories are
+  present, because a category id without the list version it came from is a string whose meaning
+  lives somewhere else.
+- **ClawBot never infers a category.** Not from link lengths, not from geometry, not from a
+  name. A repo that guessed "this looks like a weapon" from a bounding box would be manufacturing
+  exactly the confident, unfounded judgement the whole invariant refuses. The declaration is the
+  author's and only the author's.
+- **Every derivation runs regardless.** `fk`, `reach`, `hold` and `can_it` do not consult the
+  policy field.
+- **`manifest.py --as-project` refuses when the record is undeclared**, and says why: emitting it
+  would make the `none` declaration on the author's behalf. The plain bill of parts is
+  ungated — it is a shopping list for a person, not a document bound for a network.
+- **`--as-project` also refuses for categories BINGO marks refuse-network-wide.** Not because
+  ClawBot is adjudicating: because *no node can accept that job under any configuration*, so the
+  document has no valid destination. The refusal names the taxonomy version it judged against and
+  states that BINGO is authoritative.
+- That check reads a **dated copy** of BINGO's default stances, marked as a copy, cited to the
+  spec version, and carrying the date it was taken. It is a cache with provenance, the same shape
+  as OpenPartsCore ingesting a registry — not a fork, because it never overrides and always names
+  its upstream.
+
+**Consequences.** The stance copy will go stale, and that is the cost. It is bounded: it affects
+only whether ClawBot emits a document, never whether a job is accepted, and BINGO re-checks at
+matching time against the frozen list. A stale copy makes ClawBot slightly over- or
+under-cautious about emitting, and never makes a routing decision.
+
+**A prosthetic is the case to think with, not a firearm.** `regulated.medical` is node-opt-in
+rather than refused, so a declared prosthetic **emits normally** and carries its category to a
+node that has opted in with certification context. The design is correct if it lets that person
+work while making the declaration explicit — and wrong if it treats every category as a
+prohibition. Refusal is scoped to the four categories the network refuses outright.
+
+Rejected: requiring `policy` on every robot record. It would force a declaration to compute
+forward kinematics, which is the theatre above with extra steps, and it would make the field
+noise on the majority of records where the honest answer is `none`.
+
+Rejected: a `policy_categories` enum in the schema. Convenient, and it forks a taxonomy whose
+own spec says growth requires a spec revision rather than an enum edit. ClawBot stores the
+string and the version; BINGO adjudicates.
+
+Rejected: refusing to *describe* a mechanism in a refused category. ClawBot is a notation. A
+notation that cannot express a thing does not prevent the thing; it prevents the thing being
+described accurately, which is worse, and it would put this repo in the business of deciding
+what may be written down.

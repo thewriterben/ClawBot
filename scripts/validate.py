@@ -126,6 +126,25 @@ def check_robot(path: Path, report: Report) -> dict | None:
 
     check_source(report, where, "robot", robot.get("source"))
 
+    # ADR-0019: the author's declaration, never ClawBot's inference.
+    policy = robot.get("policy")
+    if policy:
+        if not (policy.get("taxonomy_version") or "").strip():
+            report.fail(where, "policy declares categories with no taxonomy_version. A "
+                               "category id without the version of the list it came "
+                               "from is a string whose meaning lives somewhere else")
+        if not policy.get("categories"):
+            report.fail(where, "policy is present with no categories; omit the field "
+                               "entirely rather than declaring nothing")
+        if not policy.get("declared_by"):
+            report.warn(where, "policy has no declared_by — a declaration is a claim a "
+                               "person makes, so it has an author rather than a method")
+    else:
+        report.warn(where, "no policy declaration (PD-5). Every derivation still runs; "
+                           "what this blocks is manifest.py --as-project, because "
+                           "emitting a fabrication-bound document would make the 'none' "
+                           "declaration on your behalf (ADR-0019)")
+
     # ---- links: exactly one kind (ADR-0006)
     links: dict[str, dict] = {}
     for link in robot.get("links", []):

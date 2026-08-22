@@ -159,6 +159,84 @@ def test_a_fabricated_size_would_have_been_caught_here():
     raise AssertionError("OBC's schema accepted a make requirement with no size_mm")
 
 
+# --------------------------------------------------------- ADR-0019: the PD-5 gate
+
+def declared(*categories, version="REFUSAL-CATEGORIES v0.1 (draft), read 2026-08-22"):
+    robot = fixture_robot()
+    robot["policy"] = {"categories": list(categories), "taxonomy_version": version,
+                       "declared_by": "test"}
+    return robot
+
+
+def test_an_undeclared_record_will_not_emit_a_project():
+    """Emitting it would make the `none` declaration on the author's behalf."""
+    try:
+        manifest.check_policy(fixture_robot())
+    except manifest.PolicyRefusal as exc:
+        assert "on your behalf" in str(exc)
+        assert "policy.taxonomy_version" in str(exc)
+        return
+    raise AssertionError("undeclared records must not emit a fabrication-bound document")
+
+
+def test_the_plain_bill_of_parts_is_ungated():
+    """A shopping list for a person is not a document bound for a network."""
+    built = manifest.build_manifest(fixture_robot(), None, None)
+    assert built["buy"], "the ungated path still works without a declaration"
+
+
+def test_declaring_none_emits_normally():
+    assert manifest.check_policy(declared("none")) == []
+
+
+def test_a_network_wide_refused_category_will_not_emit():
+    for category in ("weapons.firearms", "weapons.other", "covert.surveillance",
+                     "ip.counterfeit"):
+        try:
+            manifest.check_policy(declared(category))
+        except manifest.PolicyRefusal as exc:
+            assert "no valid destination" in str(exc)
+            assert "BINGO is authoritative" in str(exc)
+            continue
+        raise AssertionError(f"{category} must not emit")
+
+
+def test_a_prosthetic_emits_and_carries_its_category():
+    """regulated.medical is node-opt-in, not refused. The design is wrong if it
+    treats every category as a prohibition."""
+    notes = manifest.check_policy(declared("regulated.medical"))
+    assert notes, "an opt-in category should be surfaced, not silently passed"
+    assert "regulated.medical" in notes[0]
+    assert "opted in" in notes[0]
+
+
+def test_a_stale_taxonomy_version_is_flagged_not_refused():
+    notes = manifest.check_policy(declared("regulated.rf", version="v0.9 (2030)"))
+    assert any("what counts" in n for n in notes)
+
+
+def test_clawbot_never_infers_a_category():
+    """The declaration is the author's and only the author's. Nothing in the
+    emitter reads geometry to guess one."""
+    source = (Path(__file__).resolve().parent.parent / "scripts" / "manifest.py").read_text(
+        encoding="utf-8")
+    gate = source.split("def check_policy")[1].split("def as_project")[0]
+    for inferring in ("size_mm", "bbox", "link", "geometry", "length"):
+        assert inferring not in gate, f"the policy gate reads {inferring}"
+
+
+def test_the_declaration_cannot_travel_as_data_and_that_is_reported():
+    """OpenBuildCore's project schema is additionalProperties:false, so there is
+    no field for it. Prose is the only channel, and it is not machine-readable."""
+    robot = declared("regulated.medical")
+    project = manifest.as_project(robot, manifest.build_manifest(robot, None, None))
+    assert "regulated.medical" in project["description"]
+    assert "policy" not in project
+    schema = load_obc_schema()
+    import jsonschema
+    jsonschema.validate(project, schema)
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_")]
     failed = skipped = 0

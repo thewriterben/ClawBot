@@ -107,10 +107,26 @@ consequences as misdeclaring a licence. Everywhere in ClawBot, absent means *unk
 right in their own frame — a declaration is a claim somebody makes, an absent measurement is one
 nobody took — and a ClawBot position has to say which it is adopting and why.
 
-**What remains is a decision, not more reading.** Specifically: whether a `policy_categories`
-field appears on a robot record at all; whether absent means `none`-as-declared or unknown; and
-whether ClawBot refuses to *compute* over a declared-refused mechanism or merely records the
-declaration and lets consumers route on it.
+**Decided 2026-08-22 in ADR-0019**, and the middle question turned out to be the interesting one.
+
+- **Does the field exist?** Yes — `policy`, optional. The argument is mechanical rather than
+  moral: there is already a path from a robot record through `manifest.py` to OpenBuildCore to a
+  BINGO job, and BINGO reads an absent declaration as `none` *declared*. So an undeclared
+  manifest is not neutral; it makes that claim at the far end.
+- **Absent means unknown, or `none`?** Neither rule loses, because they govern **different kinds
+  of field**. This repo's absent-means-unknown covers *measurements* — nobody can declare a joint
+  limit, you measure it or you do not. A policy category is a *statement of intent*, and the
+  author always knows. So the field's nature is BINGO's; what ClawBot refuses is to **supply**
+  the declaration. Absent stays undeclared and is never converted at the boundary.
+- **Refuse to compute?** No. Forward kinematics is not fabrication and the mathematics is in every
+  textbook; a repo declining to multiply matrices would be theatre. The refusal is at the
+  **output boundary**, the same place ADR-0007 put the URDF refusal.
+
+**One consequence found while implementing it, worth reporting upstream:** OpenBuildCore's
+project schema is `additionalProperties: false` and has **no field for a policy declaration**, so
+the declaration cannot travel as data through `--as-project`. It goes as prose in `description`
+and is not machine-readable downstream. That is a gap in the seam, and the emitter says so rather
+than smuggling it.
 
 ---
 
