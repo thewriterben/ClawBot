@@ -386,3 +386,130 @@ Rejected: a learned policy surface — action-space definitions, simulation expo
 schemas. Not because it is wrong, but because it is a second product rather than a schema
 change, and nothing in the repo is built yet. It goes on the ROADMAP under "Not yet", where a
 real request can pull it forward.
+
+---
+
+## ADR-0011 — An assembly is a graph of steps, and build time is never modelled
+
+**Date:** 2026-08-22
+**Status:** accepted
+
+**Context.** A robot record says what a mechanism *is*. Nothing said what somebody has to *do*
+to end up holding one, and the gap is not cosmetic: the difference between a described robot
+and a built robot is a pile of fasteners, an order to install them in, and a handful of steps
+that cannot be undone.
+
+Three things had to be decided.
+
+**Shape.** A numbered list is the obvious form and it destroys information. "These two
+sub-assemblies can be built in either order" and "this one must come first" are different facts,
+and a list can only express the second. Anyone reading a list has to guess which constraints are
+real, and the guesses that matter are the ones about steps that cannot be reversed.
+
+**Time.** The temptation is a `build_time_minutes` field, or worse, a per-step estimate summed
+into a total. OpenBuildCore settled the general case for print time in its ADR-0005: a modelled
+estimate "is wrong by factors rather than percentages ... and once printed it will be read as a
+measurement." Assembly is worse than printing, because the dominant variable is the builder. An
+author assembling their own design for the fifth time and a stranger doing it for the first are
+not the same measurement with noise; they are different quantities.
+
+**Torque.** A fastener torque is a physical claim about hardware, exactly like a joint limit, and
+its failure mode is sharper than most: a stripped heat-set insert in a printed part is
+unrecoverable, and it is the single most common way a first build is damaged. The convention in
+hobby documentation is to say nothing, and "nothing" is read as "hand tight", which is a number
+somebody invented at the bench.
+
+**Decision.**
+
+- Steps form a **DAG**, each naming its `depends_on`. A cycle is a validation error. Two steps
+  with the same dependencies are genuinely order-free and the file says so.
+- **No `build_time` field.** Only `measured_build_time`, requiring `how_measured` and carrying
+  `builder_experience`, because the author of an assembly is simultaneously the fastest possible
+  builder and the least representative one. Absent means the answer is that it requires building
+  one — the same shape as OBC answering "requires slicing".
+- **`torque_nm` is citation-gated and absent means UNKNOWN.** Not hand tight, not snug. Most
+  hobby assemblies will carry null, and that is a true statement about the evidence.
+- **`irreversible` is a declared boolean.** A press fit, a cut, a heat-set insert, a permanent
+  adhesive. No downstream tool can infer it, and declaring it is what allows a warning *before*
+  the step rather than a discovery after it.
+- **`verify` is prose per step**, because a step whose failure only becomes visible three steps
+  later is the expensive kind, and naming the check is cheap.
+
+**Consequences.** Assembly records will be laborious to write and mostly full of nulls where
+torque should be. That is the same friction ADR-0003 accepted for reach: the fields it demands
+are the ones that make the answer true, and a null torque at least announces itself.
+
+A DAG is harder to render than a list. Rendering a linearisation for a human is fine and
+expected — what is refused is *storing* the linearisation, because that is where the
+distinction between "must" and "may" is lost.
+
+Rejected: per-step time estimates, even marked as estimates. Summing guesses produces a total
+that looks more precise than any of its inputs, which is how a guess acquires authority.
+
+Rejected: modelling fastener torque from thread size and material. The relationship exists in
+engineering literature, but for a heat-set insert in a 3D-printed part it depends on the insert,
+the boss geometry, the material, the infill and the installation temperature — a derivation with
+five unsourced inputs is five guesses wearing one citation.
+
+---
+
+## ADR-0012 — A cable that crosses a joint is a joint limit
+
+**Date:** 2026-08-22
+**Status:** accepted (narrows ADR-0003)
+
+**Context.** ADR-0003 computes reachability from link transforms, joint types and joint limits,
+and admits one known optimism: self-collision is not modelled, so computed reach claims points
+the arm cannot occupy without hitting itself.
+
+There is a second source of the same optimism and it was not written down. **The wiring is part
+of the mechanism.** A servo cable running from a wrist back to a controller in the base crosses
+every joint between them, and unless somebody left enough slack, it binds before the joint
+does. The mechanism's real travel is the tighter of what the hardware permits and what the
+harness permits — and the second number lives nowhere in the robot record.
+
+This is not a rare edge case. It is the normal state of a first build, it is discovered by
+either a snagged cable or a torn-out connector, and it is invisible to every model that treats
+wiring as an implementation detail. It is also the reason a mechanism that worked on the bench
+stops working once it is tidied.
+
+The neighbouring temptation is to *compute* it: take a declared service loop, a cable bend
+radius, and the joint geometry, and derive permitted travel. That derivation needs cable
+mechanics — bend radius under load, torsion, how a bundle behaves differently from a strand —
+none of which this repo has sources for, and all of which would produce a plausible number.
+
+**Decision.** The harness may narrow a joint's travel, and it may only do so with a figure
+somebody established.
+
+- A `run` declares which joints it `crosses`.
+- `permits_full_travel` is a tri-state and **null means nobody checked** — the common case, and
+  it must never be read as true.
+- `travel_limit` carries the narrower bound **and requires `how_determined`**, the same gate as
+  `measured_payload` and for the same reason.
+- A reachability computation takes **the tightest of** the joint's own limits, the actuator's
+  travel, and any harness limit — and **names which one bound**, because "this arm cannot reach
+  that" and "this arm's wiring cannot reach that" have different fixes and only one of them
+  requires a new servo.
+- `service_loop_mm` is recorded and **feeds no derivation**, exactly as `gearbox.efficiency` is
+  recorded and unused. The number is there for when the mechanics are sourced.
+
+**Consequences.** A reachability verdict now has a third caveat to carry alongside the tool
+offset and the self-collision warning: whether the harness was checked. A robot with no harness
+record, or one with `permits_full_travel: null`, gets an answer that says so.
+
+This makes ClawBot's optimism *legible* rather than fixing it. Both known over-claims —
+self-collision and wiring — are now named in the returned value instead of in documentation,
+which is inherited invariant #4 and the only honest position available while neither is
+modelled.
+
+There is a real cost: three sources of truth for one joint's travel — the joint's `limits`, the
+actuator's `travel`, and the harness's `travel_limit`. Three places to disagree. The mitigation
+is that they are *different claims* rather than duplicates — what the mechanism permits, what
+the motor can do, what the wiring allows — and collapsing them into one field would lose which
+is which, which is precisely the fix a caller needs.
+
+**Also settled here, quietly:** the channel map. ADR-0010 said ClawBot publishes a control
+contract and never commands. `harness.channels` is that contract — joint to physical output,
+plus `inverted` and `zero_offset_rad`. Both of those are facts about how the thing was
+physically built that no amount of modelling recovers, and `inverted` is the most common reason
+a correct model drives a mechanism into its own end stop.

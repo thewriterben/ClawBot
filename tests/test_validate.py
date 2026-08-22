@@ -1,0 +1,347 @@
+#!/usr/bin/env python3
+"""Negative tests: proof that the validator refuses.
+
+A validator nobody has watched reject something is a validator that might be
+returning zero because it never looks. Every rule with teeth in DECISIONS.md gets
+a test here that makes it bite, and the two that are deliberately *warnings*
+rather than failures get a test proving they do not block — because "unknown"
+being allowed through is the whole point of ADR-0003.
+
+Runs under pytest, or standalone:
+
+    python tests/test_validate.py
+"""
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+import validate  # noqa: E402
+
+SRC = {"citation": "test fixture"}
+
+
+def robot(**overrides) -> dict:
+    """A minimal valid two-link robot. Tests corrupt one thing at a time."""
+    base = {
+        "schema_version": 0,
+        "robot_id": "fixture",
+        "kind": "arm",
+        "base_link": "base",
+        "links": [
+            {"link_id": "base", "make": {"size_mm": {"x": 1, "y": 1, "z": 1},
+                                         "material": "petg"}, "source": SRC},
+            {"link_id": "arm", "part_id": "mechanical/fixture", "source": SRC},
+        ],
+        "joints": [
+            {"joint_id": "j1", "type": "revolute", "parent": "base", "child": "arm",
+             "origin": {}, "axis": {"x": 0, "y": 0, "z": 1},
+             "limits": {"lower_rad": -1.5, "upper_rad": 1.5, "source": SRC},
+             "source": SRC},
+        ],
+        "source": SRC,
+    }
+    base.update(overrides)
+    return base
+
+
+def run(kind: str, doc: dict, robots: dict | None = None):
+    """Check one document, returning the report."""
+    report = validate.Report()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "fixture.json"
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        if kind == "robot":
+            validate.check_robot(path, report)
+        elif kind == "actuator":
+            validate.check_actuator(path, report)
+        elif kind == "assembly":
+            validate.check_assembly(path, report, robots or {})
+        else:
+            validate.check_harness(path, report, robots or {})
+    return report
+
+
+def refuses(report, needle: str) -> bool:
+    return any(needle in f for f in report.failures)
+
+
+def warns(report, needle: str) -> bool:
+    return any(needle in w for w in report.warnings)
+
+
+# ------------------------------------------------------------------ the positive
+
+def test_minimal_robot_is_valid():
+    assert run("robot", robot()).failures == []
+
+
+# ------------------------------------------------- ADR-0005: radians in the file
+
+def test_degrees_in_a_rad_field_are_refused():
+    """The main defence ADR-0005 leaves standing."""
+    doc = robot()
+    doc["joints"][0]["limits"] = {"lower_rad": -90, "upper_rad": 90, "source": SRC}
+    report = run("robot", doc)
+    assert refuses(report, "outside +/-4*pi")
+    assert refuses(report, "If this is degrees")
+
+
+def test_inverted_limits_are_refused():
+    doc = robot()
+    doc["joints"][0]["limits"] = {"lower_rad": 1.5, "upper_rad": -1.5, "source": SRC}
+    assert refuses(run("robot", doc), "exceeds upper_rad")
+
+
+def test_bare_integer_radians_warn_but_pass():
+    """open-questions #4: a `3` is plausibly 3 rad and plausibly 30 degrees.
+    In range either way, so it cannot be refused — but it can be surfaced."""
+    doc = robot()
+    doc["joints"][0]["limits"] = {"lower_rad": -3, "upper_rad": 3, "source": SRC}
+    report = run("robot", doc)
+    assert report.failures == []
+    assert warns(report, "bare integer in radians")
+
+
+# --------------------------------------------------------- ADR-0008: it's a tree
+
+def test_two_parents_for_one_link_is_refused():
+    """A loop, not a tree."""
+    doc = robot()
+    doc["links"].append({"link_id": "extra", "part_id": "mechanical/x", "source": SRC})
+    doc["joints"].append(
+        {"joint_id": "j2", "type": "revolute", "parent": "extra", "child": "arm",
+         "origin": {}, "axis": {"x": 1, "y": 0, "z": 0},
+         "limits": {"lower_rad": -1, "upper_rad": 1, "source": SRC}, "source": SRC})
+    assert refuses(run("robot", doc), "two parents is a loop")
+
+
+def test_unreachable_link_is_refused():
+    doc = robot()
+    doc["links"].append({"link_id": "floating", "part_id": "mechanical/x", "source": SRC})
+    assert refuses(run("robot", doc), "not reachable from base_link")
+
+
+def test_branching_tree_is_allowed():
+    """The contradiction ADR-0008 resolved: a tree branches, a serial chain does not."""
+    doc = robot()
+    doc["links"].append({"link_id": "head", "part_id": "mechanical/x", "source": SRC})
+    doc["joints"].append(
+        {"joint_id": "j2", "type": "revolute", "parent": "base", "child": "head",
+         "origin": {}, "axis": {"x": 0, "y": 1, "z": 0},
+         "limits": {"lower_rad": -1, "upper_rad": 1, "source": SRC}, "source": SRC})
+    assert run("robot", doc).failures == []
+
+
+# ---------------------------------------------------------- ADR-0008: mimic rules
+
+def test_mimic_cycle_is_refused():
+    doc = robot()
+    doc["links"].append({"link_id": "jaw", "part_id": "mechanical/x", "source": SRC})
+    doc["joints"].append(
+        {"joint_id": "j2", "type": "revolute", "parent": "arm", "child": "jaw",
+         "origin": {}, "axis": {"x": 0, "y": 0, "z": 1},
+         "limits": {"lower_rad": -1, "upper_rad": 1, "source": SRC},
+         "mimic": {"joint": "j1"}, "source": SRC})
+    doc["joints"][0]["mimic"] = {"joint": "j2"}
+    assert refuses(run("robot", doc), "mimic cycle")
+
+
+def test_mimic_naming_a_missing_joint_is_refused():
+    doc = robot()
+    doc["joints"][0]["mimic"] = {"joint": "nonexistent"}
+    assert refuses(run("robot", doc), "does not exist")
+
+
+def test_coupled_gripper_is_valid():
+    """The mechanism ADR-0008 made expressible: one actuator, two jaws, no loop."""
+    doc = robot()
+    for jaw in ("left", "right"):
+        doc["links"].append({"link_id": jaw, "part_id": "mechanical/jaw", "source": SRC})
+    doc["joints"].append(
+        {"joint_id": "left-jaw", "type": "prismatic", "parent": "arm", "child": "left",
+         "origin": {}, "axis": {"x": 1, "y": 0, "z": 0},
+         "limits": {"lower_mm": 0, "upper_mm": 20, "source": SRC}, "source": SRC})
+    doc["joints"].append(
+        {"joint_id": "right-jaw", "type": "prismatic", "parent": "arm", "child": "right",
+         "origin": {}, "axis": {"x": 1, "y": 0, "z": 0},
+         "limits": {"lower_mm": 0, "upper_mm": 20, "source": SRC},
+         "mimic": {"joint": "left-jaw", "multiplier": -1}, "source": SRC})
+    assert run("robot", doc).failures == []
+
+
+# ------------------------------------------------------- ADR-0006: link is one kind
+
+def test_link_with_two_kinds_is_refused():
+    doc = robot()
+    doc["links"][1]["make"] = {"size_mm": {"x": 1, "y": 1, "z": 1}, "material": "petg"}
+    assert refuses(run("robot", doc), "declares 2 of part_id/make/provenance_ref")
+
+
+def test_link_with_no_kind_is_refused():
+    doc = robot()
+    del doc["links"][1]["part_id"]
+    assert refuses(run("robot", doc), "declares 0 of part_id/make/provenance_ref")
+
+
+# --------------------------------------------------------------- the citation gate
+
+def test_uncited_joint_is_refused():
+    doc = robot()
+    del doc["joints"][0]["source"]
+    assert refuses(run("robot", doc), "has no source")
+
+
+def test_todo_source_passes_but_is_counted():
+    """A placeholder must block downstream, not here. It is what it is for."""
+    doc = robot()
+    doc["joints"][0]["source"] = {"citation": "TODO(source)"}
+    report = run("robot", doc)
+    assert report.failures == []
+    assert report.todo_sources == 1
+
+
+# --------------------------------------------------------- ADR-0003: unknown limits
+
+def test_missing_limits_warn_but_do_not_block():
+    """The honest state the whole repo is built around. Refusing it would be wrong."""
+    doc = robot()
+    doc["joints"][0]["limits"] = None
+    report = run("robot", doc)
+    assert report.failures == []
+    assert warns(report, "UNKNOWN, never unlimited")
+
+
+def test_zero_axis_is_refused():
+    doc = robot()
+    doc["joints"][0]["axis"] = {"x": 0, "y": 0, "z": 0}
+    assert refuses(run("robot", doc), "axis is the zero vector")
+
+
+# ------------------------------------------------- ADR-0009: floating and planar
+
+def test_floating_joint_is_a_valid_type():
+    doc = robot()
+    doc["joints"][0] = {"joint_id": "j1", "type": "floating", "parent": "base",
+                        "child": "arm", "origin": {}, "source": SRC}
+    assert run("robot", doc).failures == []
+
+
+def test_floating_joint_with_limits_is_refused():
+    doc = robot()
+    doc["joints"][0] = {"joint_id": "j1", "type": "floating", "parent": "base",
+                        "child": "arm", "origin": {},
+                        "limits": {"lower_rad": -1, "upper_rad": 1, "source": SRC},
+                        "source": SRC}
+    assert refuses(run("robot", doc), "bounded by an")
+
+
+# ------------------------------------------------------------- ADR-0004: actuators
+
+def test_rule_of_thumb_continuous_torque_is_refused():
+    """The exact failure ADR-0004 exists to prevent."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
+           "stall_torque_nm": {"value": 2.0, "at_volts": 6.0, "source": SRC},
+           "continuous_torque_nm": {"value": 0.6, "at_volts": 6.0,
+                                    "how_determined": "30% of stall torque, typical",
+                                    "source": SRC}}
+    assert refuses(run("actuator", doc), "reads like a rule of thumb")
+
+
+def test_continuous_above_stall_is_refused():
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
+           "stall_torque_nm": {"value": 2.0, "at_volts": 6.0, "source": SRC},
+           "continuous_torque_nm": {"value": 3.0, "at_volts": 6.0,
+                                    "how_determined": "measured, held 10 min to steady state",
+                                    "source": SRC}}
+    assert refuses(run("actuator", doc), "not less than stall")
+
+
+def test_torque_without_voltage_is_refused():
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
+           "stall_torque_nm": {"value": 2.0, "source": SRC}}
+    assert refuses(run("actuator", doc), "without its supply voltage")
+
+
+def test_stall_only_actuator_is_valid_and_warns():
+    """The XM430 case: a good datasheet, and capacity still underivable."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "smart-servo", "source": SRC,
+           "stall_torque_nm": {"value": 4.1, "at_volts": 12.0, "source": SRC},
+           "continuous_torque_nm": None}
+    report = run("actuator", doc)
+    assert report.failures == []
+    assert warns(report, "capacity is underivable")
+
+
+# ------------------------------------------------------------ ADR-0011: assemblies
+
+def test_assembly_dependency_cycle_is_refused():
+    doc = {"schema_version": 0, "assembly_id": "a", "robot_id": "fixture", "source": SRC,
+           "steps": [{"step_id": "one", "action": "x", "depends_on": ["two"]},
+                     {"step_id": "two", "action": "y", "depends_on": ["one"]}]}
+    assert refuses(run("assembly", doc), "dependency cycle")
+
+
+def test_assembly_step_joining_a_missing_link_is_refused():
+    model = {"robot": robot(), "links": {"base": {}, "arm": {}}, "joints": {"j1": {}}}
+    doc = {"schema_version": 0, "assembly_id": "a", "robot_id": "fixture", "source": SRC,
+           "steps": [{"step_id": "one", "action": "x", "joins": ["nonexistent"]}]}
+    assert refuses(run("assembly", doc, {"fixture": model}), "not in the robot record")
+
+
+def test_measured_build_time_without_method_is_refused():
+    doc = {"schema_version": 0, "assembly_id": "a", "robot_id": "fixture", "source": SRC,
+           "steps": [{"step_id": "one", "action": "x"}],
+           "measured_build_time": {"minutes": 90, "how_measured": "  "}}
+    assert refuses(run("assembly", doc), "no how_measured")
+
+
+# -------------------------------------------------------------- ADR-0012: harness
+
+def test_two_channels_driving_one_joint_is_refused():
+    doc = {"schema_version": 0, "harness_id": "h", "robot_id": "fixture", "source": SRC,
+           "channels": [{"joint_id": "j1", "channel": 0, "inverted": False},
+                        {"joint_id": "j1", "channel": 1, "inverted": False}]}
+    assert refuses(run("harness", doc), "driven by two channels")
+
+
+def test_duplicate_bus_address_is_refused():
+    doc = {"schema_version": 0, "harness_id": "h", "robot_id": "fixture", "source": SRC,
+           "channels": [
+               {"joint_id": "j1", "bus": "i2c", "bus_address": 64, "inverted": False},
+               {"joint_id": "j2", "bus": "i2c", "bus_address": 64, "inverted": False}]}
+    assert refuses(run("harness", doc), "is already used by joint")
+
+
+def test_harness_travel_limit_without_method_is_refused():
+    doc = {"schema_version": 0, "harness_id": "h", "robot_id": "fixture", "source": SRC,
+           "routing": [{"run_id": "r1", "crosses": ["j1"],
+                        "travel_limit": [{"joint_id": "j1", "lower_rad": -1,
+                                          "upper_rad": 1, "how_determined": ""}]}]}
+    assert refuses(run("harness", doc), "no how_determined")
+
+
+def test_unchecked_cable_run_warns_loudly():
+    """ADR-0012's whole point: null means nobody checked, never true."""
+    doc = {"schema_version": 0, "harness_id": "h", "robot_id": "fixture", "source": SRC,
+           "routing": [{"run_id": "r1", "crosses": ["j1"], "permits_full_travel": None}]}
+    report = run("harness", doc)
+    assert report.failures == []
+    assert warns(report, "NOBODY CHECKED")
+
+
+if __name__ == "__main__":
+    tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_")]
+    failed = 0
+    for name, fn in tests:
+        try:
+            fn()
+            print(f"pass  {name}")
+        except AssertionError:
+            failed += 1
+            print(f"FAIL  {name}")
+    print(f"\n{len(tests) - failed}/{len(tests)} passed")
+    sys.exit(1 if failed else 0)

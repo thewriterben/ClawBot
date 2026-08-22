@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""The seam test: does ClawBot's output actually satisfy OpenBuildCore's schema?
+
+ADR-0006 says the peers meet at data rather than at an API, and `manifest.py`
+claims its output "drops into `data/projects/` without translating anything".
+That is a claim about another repo's schema, and the only honest way to hold it
+is to fetch that schema and check against it — which is what this does.
+
+If OpenBuildCore is not checked out beside this repo, or `jsonschema` is not
+installed, the cross-repo tests skip rather than pass. A skipped test is an
+honest "not checked"; a passing one that never ran is the failure mode this
+whole platform is built to refuse.
+
+    python tests/test_manifest.py
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+import manifest  # noqa: E402
+
+OBC_SCHEMA = (Path(__file__).resolve().parents[2] / "OpenBuildCore"
+              / "schema" / "project.schema.json")
+SRC = {"citation": "test fixture"}
+
+
+class Skip(Exception):
+    pass
+
+
+def fixture_robot() -> dict:
+    """A robot exercising all three link kinds at once."""
+    return {
+        "schema_version": 0,
+        "robot_id": "seam-fixture",
+        "make": "Fixture",
+        "model": "Mk I",
+        "kind": "arm",
+        "base_link": "base",
+        "links": [
+            {"link_id": "base", "make": {"size_mm": {"x": 80, "y": 80, "z": 20},
+                                         "material": "petg"}, "source": SRC},
+            {"link_id": "upper-arm", "part_id": "mechanical/alu-extrusion-2020",
+             "source": SRC},
+            {"link_id": "fore-arm", "part_id": "mechanical/alu-extrusion-2020",
+             "source": SRC},
+            {"link_id": "wrist", "provenance_ref": {
+                "artifact_sha256": "e8401edf6cd1" + "0" * 52,
+                "schema": "odc/provenance/0.2"}, "source": SRC},
+        ],
+        "joints": [
+            {"joint_id": "shoulder", "type": "revolute", "parent": "base",
+             "child": "upper-arm", "origin": {}, "axis": {"x": 0, "y": 0, "z": 1},
+             "limits": {"lower_rad": -1.5, "upper_rad": 1.5, "source": SRC},
+             "actuator_id": "not-in-data", "source": SRC},
+            {"joint_id": "elbow", "type": "revolute", "parent": "upper-arm",
+             "child": "fore-arm", "origin": {}, "axis": {"x": 0, "y": 1, "z": 0},
+             "limits": None, "source": SRC},
+            {"joint_id": "wrist-pitch", "type": "revolute", "parent": "fore-arm",
+             "child": "wrist", "origin": {}, "axis": {"x": 0, "y": 1, "z": 0},
+             "limits": {"lower_rad": -1.0, "upper_rad": 1.0, "source": SRC},
+             "source": SRC},
+        ],
+        "source": SRC,
+    }
+
+
+def fixture_assembly() -> dict:
+    return {"schema_version": 0, "assembly_id": "a", "robot_id": "seam-fixture",
+            "source": SRC,
+            "steps": [{"step_id": "mount", "action": "Bolt the base down",
+                       "fasteners": [
+                           {"part_id": "mechanical/m3x8-shcs", "qty": 4},
+                           {"spec": "M3 heat-set insert OD 4.6", "qty": 4}]}]}
+
+
+def built() -> dict:
+    return manifest.build_manifest(fixture_robot(), fixture_assembly(), None)
+
+
+# ------------------------------------------------------------------ the mapping
+
+def test_identical_part_ids_aggregate():
+    """Two links, one part id, quantity two. OBC allocates exclusively, so this
+    is the difference between a buildable arm and one short an extrusion."""
+    buy = {r["part_id"]: r["qty"] for r in built()["buy"]}
+    assert buy["mechanical/alu-extrusion-2020"] == 2
+
+
+def test_fastener_quantities_come_from_the_assembly():
+    buy = {r["part_id"]: r["qty"] for r in built()["buy"]}
+    assert buy["mechanical/m3x8-shcs"] == 4
+
+
+def test_make_links_carry_obc_fields_verbatim():
+    make = built()["make"][0]
+    assert make["size_mm"] == {"x": 80, "y": 80, "z": 20}
+    assert make["material"] == "petg"
+
+
+def test_provenance_links_are_not_invented_into_make_requirements():
+    """The refusal that matters. ClawBot holds a hash and no bounding box, so
+    emitting a size_mm here would be a fabricated number in a valid document."""
+    m = built()
+    assert len(m["designed"]) == 1
+    assert m["designed"][0]["link_id"] == "wrist"
+    assert all(r["make"] != "wrist" for r in m["make"])
+    project = manifest.as_project(fixture_robot(), m)
+    assert all(r.get("make") != "wrist" for r in project["requires"])
+
+
+def test_uncatalogued_parts_are_reported_not_dropped():
+    """A part with no registry id cannot be matched — saying so beats silence."""
+    what = {r["what"]: r["qty"] for r in built()["uncatalogued"]}
+    assert what["M3 heat-set insert OD 4.6"] == 4
+    assert what["not-in-data"] == 1
+
+
+def test_unlimited_joints_are_surfaced_in_the_rendering():
+    text = manifest.render(built(), fixture_robot())
+    assert "elbow" in text and "incomplete" in text
+
+
+# --------------------------------------------------------------- the cross-repo
+
+def load_obc_schema():
+    if not OBC_SCHEMA.exists():
+        raise Skip(f"OpenBuildCore not found at {OBC_SCHEMA}")
+    try:
+        import jsonschema  # noqa: F401
+    except ImportError:
+        raise Skip("jsonschema not installed")
+    return json.loads(OBC_SCHEMA.read_text(encoding="utf-8"))
+
+
+def test_emitted_project_validates_against_openbuildcores_own_schema():
+    import jsonschema
+    schema = load_obc_schema()
+    project = manifest.as_project(fixture_robot(), built())
+    jsonschema.validate(project, schema)
+
+
+def test_a_fabricated_size_would_have_been_caught_here():
+    """Proof the check above is load-bearing: OBC's schema rejects a make
+    requirement with no size_mm, so if manifest.py ever emitted a provenance
+    link as a make without inventing dimensions, this test would fail — and if
+    it invented them, only the refusal test above would catch it."""
+    import jsonschema
+    schema = load_obc_schema()
+    project = manifest.as_project(fixture_robot(), built())
+    project["requires"].append({"make": "wrist", "material": "petg", "qty": 1})
+    try:
+        jsonschema.validate(project, schema)
+    except jsonschema.ValidationError:
+        return
+    raise AssertionError("OBC's schema accepted a make requirement with no size_mm")
+
+
+if __name__ == "__main__":
+    tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_")]
+    failed = skipped = 0
+    for name, fn in tests:
+        try:
+            fn()
+            print(f"pass  {name}")
+        except Skip as exc:
+            skipped += 1
+            print(f"SKIP  {name} — {exc}")
+        except AssertionError as exc:
+            failed += 1
+            print(f"FAIL  {name} — {exc}")
+    print(f"\n{len(tests) - failed - skipped}/{len(tests)} passed"
+          + (f", {skipped} skipped" if skipped else ""))
+    sys.exit(1 if failed else 0)

@@ -97,3 +97,63 @@ three stall figures and no continuous one. The prediction was made from reasonin
 confirmed from a datasheet. The 30-50%-of-stall rule of thumb exists in the trade press and
 stays refused: the range spans a factor of 1.67, so choosing a point in it is a guess, and
 `how_determined` exists to reject exactly that.
+
+---
+
+## [2026-08-22] build | Two schemas for the half a robot record never described, and the first code
+
+A robot record says what a mechanism *is*. Nothing said what somebody has to *do* to end up
+holding one, or how the wires get from the controller to the joints. Both gaps turned out to
+carry a decision with teeth.
+
+**Assembly (ADR-0011).** Three things had to be settled and two of them were refusals. Steps
+form a **DAG**, not a list, because "these two can be done in either order" and "this one must
+come first" are different facts and a numbered list can only express the second — and the
+constraints that matter most are the ones about steps that cannot be undone. **Build time is
+never modelled**, following OBC ADR-0005 on print time, and assembly is worse than printing
+because the dominant variable is the builder: an author on their fifth build and a stranger on
+their first are not one measurement with noise, they are different quantities, which is why
+`measured_build_time` carries `builder_experience`. And **fastener torque is citation-gated with
+absence meaning UNKNOWN** — not "hand tight", which is a number somebody invented at the bench.
+The failure mode is a stripped heat-set insert in a printed part, which is unrecoverable.
+
+**Harness (ADR-0012), and the finding worth keeping.** The wiring is part of the mechanism. A
+servo cable running from a wrist to a controller in the base crosses every joint between them,
+and unless somebody left slack, **it binds before the joint does**. So a mechanism's real travel
+is the tighter of what the hardware permits and what the harness permits, and the second number
+lived nowhere. `permits_full_travel` is tri-state and **null means nobody checked** — never that
+it is fine.
+
+The neighbouring temptation was to *compute* it from a declared service loop and a bend radius.
+Refused: that needs cable mechanics under load that this repo has no source for, and it would
+produce a plausible number. `service_loop_mm` is recorded and feeds nothing, exactly as
+`gearbox.efficiency` is.
+
+This gives ADR-0003 a second known over-claim alongside self-collision, and the right response
+was the same one: name it in the returned value rather than fix it silently.
+
+**Three sources of truth for one joint's travel** — the joint's `limits`, the actuator's
+`travel`, the harness's `travel_limit` — and that is deliberate. They are different claims, not
+duplicates: what the mechanism permits, what the motor can do, what the wiring allows.
+Collapsing them would lose which one bound, and "this arm cannot reach that" and "this arm's
+*wiring* cannot reach that" have different fixes.
+
+**The first code, and the first proof that a rule bites.** `validate.py` in
+[[openbuildcore]]'s and OpenPartsCore's idiom — stdlib only, structure as the easy half,
+referential integrity as the half that matters. 29 negative tests, one per rule with teeth:
+degrees in a `_rad` field, a link with two parents, a mimic cycle, a link declaring two kinds, a
+continuous torque whose `how_determined` reads like a fraction of stall. Two tests exist to prove
+the *warnings* do not block, because "unknown" passing through is the entire point of ADR-0003.
+
+**And the seam, tested against the peer's own file.** `manifest.py` emits a bill of parts in
+OpenBuildCore's three-kind vocabulary, and the test validates the output against
+`OpenBuildCore/schema/project.schema.json` itself rather than a copy — skipping honestly if that
+repo is not checked out, because a skipped test is an honest "not checked" and a passing test
+that never ran is the failure this platform exists to refuse.
+
+The interesting part of that emitter is what it will not do. Three link kinds do not map onto
+three requirement kinds: a `provenance_ref` is a hash and nothing else, so ClawBot has no
+bounding box to declare, and emitting a `make` requirement for it would put a fabricated
+`size_mm` inside a document that validates. Those links are reported separately and handed to
+OBC's `can-print --from-sidecar`, which judges the real geometry (ODC ADR-0010) and is the
+stronger check anyway.

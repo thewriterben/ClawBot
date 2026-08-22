@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clawbot/harness.schema.json",
+  "title": "Harness",
+  "description": "What connects the actuators to the thing that drives them, and to power. Two facts live here that live nowhere else on the platform. First: a cable crossing a joint CONSTRAINS THAT JOINT'S TRAVEL, so a mechanism's real limits are the tighter of its hardware limits and its wiring, and a reachability answer that ignores the harness over-claims (ADR-0012). Second: the channel map is where a controller learns which actuator is which — and where the degrees/radians seam between this platform's repos is resolved, at one boundary, on purpose (ADR-0010).",
+  "type": "object",
+  "required": ["schema_version", "harness_id", "robot_id", "source"],
+  "properties": {
+    "schema_version": { "const": 0 },
+    "harness_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "robot_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "The robot this harness wires. Stored, not resolved." },
+
+    "controller": {
+      "type": ["object", "null"],
+      "description": "What drives the actuators. A part_id from OpenPartsCore's boards namespace where one exists — the board's facts belong upstream, and what belongs here is what it drives.",
+      "properties": {
+        "part_id": { "type": "string", "description": "e.g. boards/esp32-s3. Stored, not resolved (ADR-0006)." },
+        "note": { "type": "string" },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
+
+    "channels": {
+      "type": "array",
+      "description": "One entry per driven joint. This is the control contract of ADR-0010 made concrete: a controller reads it to learn which physical output moves which joint, and in which direction. ClawBot does not command anything — it publishes this and a runtime reads it.",
+      "items": { "$ref": "#/$defs/channel" }
+    },
+
+    "routing": {
+      "type": "array",
+      "description": "Which cables cross which joints, and what that costs. The reason this schema exists.",
+      "items": { "$ref": "#/$defs/run" }
+    },
+
+    "power": {
+      "type": ["object", "null"],
+      "description": "Supply facts. Note that no total is stored: a current budget is DERIVED from the actuator records and reported with its basis, because a stored total silently goes stale the moment an actuator changes and cannot say which assumption produced it (inherited invariant #4, and OpenBuildCore's sequential/simultaneous basis in its ADR-0004).",
+      "properties": {
+        "supply_volts": { "type": "number", "exclusiveMinimum": 0, "description": "What the harness actually delivers to the actuators. Load-bearing: a torque figure is meaningless without its voltage, and the XM430 differs by 26% across its own rated range. A derivation must use the actuator figure measured at THIS voltage, or say it could not." },
+        "supply_current_a": { "type": "number", "exclusiveMinimum": 0, "description": "What the supply can actually deliver, from its own datasheet. Compared against a derived worst-case draw; absent means the comparison answers incomplete rather than assuming the supply is adequate." },
+        "shared_with_logic": { "type": "boolean", "description": "Whether actuator power and controller logic share a rail. If true, an actuator stall can brown out the controller — which turns a mechanical problem into a loss of control, and is worth knowing before it happens." },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
+
+    "source": { "$ref": "#/$defs/source" },
+    "note": { "type": "string" }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "channel": {
+      "type": "object",
+      "required": ["joint_id"],
+      "properties": {
+        "joint_id": { "type": "string", "description": "The joint this channel drives. Must exist in the robot record; a validator checks across the two files." },
+        "channel": { "type": ["integer", "string"], "description": "The controller's own identifier for this output — a PWM channel number, a bus id, a CAN node id. Whatever the controller calls it, verbatim." },
+        "bus": { "enum": ["pwm", "i2c", "spi", "uart", "can", "rs485", "step-dir"], "description": "How the command physically reaches the actuator. Determines what the controller can KNOW as much as what it can do: a pwm actuator reports nothing back." },
+        "bus_address": { "type": ["integer", "string"], "description": "Address on a shared bus. Two actuators sharing an address is a validation error and a genuinely common build mistake." },
+        "inverted": {
+          "type": "boolean",
+          "description": "True when a positive command produces motion in the negative direction of the joint's declared axis. This is a fact about how the actuator was physically installed, and it is the single most common reason a correct model drives a mechanism into its own end stop. Absent means NOT inverted, which is the one safe default here because it is a statement about wiring the author is asserting, not a physical quantity nobody measured."
+        },
+        "zero_offset_rad": {
+          "type": "number",
+          "minimum": -12.57,
+          "maximum": 12.57,
+          "description": "The actuator's zero position expressed in joint coordinates. Corke names this as a distinct source of ambiguity that a DH table cannot carry: the mechanism's zero-angle pose and the controller's zero-angle pose are routinely different. Radians, per ADR-0005 — and note that the consumer most likely to read this field, Oh-Ben-Claw's ServoAngle, is in DEGREES. The conversion happens once, at that boundary, and is named here so it cannot be forgotten quietly (ADR-0010)."
+        },
+        "source": { "$ref": "#/$defs/source" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "run": {
+      "type": "object",
+      "description": "A cable, and the joints it crosses on its way. A run that crosses a joint must either declare enough service loop to permit the joint's full travel, or declare the travel it actually permits — and in that second case the harness becomes the binding limit.",
+      "required": ["run_id", "crosses"],
+      "properties": {
+        "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "serves": { "type": "array", "items": { "type": "string" }, "description": "joint_ids or component names this run carries signal or power to." },
+        "crosses": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "joint_ids this cable passes across. Every joint listed here has its travel potentially limited by this run. May be empty for a run that stays within one link."
+        },
+        "permits_full_travel": {
+          "type": ["boolean", "null"],
+          "description": "Whether this run has been confirmed to allow the joints it crosses their full declared travel. NULL MEANS NOBODY CHECKED, which is the common case and must not be read as true. A reachability answer computed over a robot whose harness has a null here is optimistic in the same direction ADR-0003 already regrets for self-collision, and must say so."
+        },
+        "travel_limit": {
+          "type": ["array", "null"],
+          "description": "Where the harness binds tighter than the joint. Only ever a limit somebody established, with the method — the same gate as measured_payload. This is the field that makes a harness capable of narrowing a mechanism's real workspace.",
+          "items": {
+            "type": "object",
+            "required": ["joint_id", "how_determined"],
+            "properties": {
+              "joint_id": { "type": "string" },
+              "lower_rad": { "type": "number", "minimum": -12.57, "maximum": 12.57 },
+              "upper_rad": { "type": "number", "minimum": -12.57, "maximum": 12.57 },
+              "lower_mm": { "type": "number" },
+              "upper_mm": { "type": "number" },
+              "how_determined": { "type": "string", "minLength": 1, "description": "Measured on the assembled mechanism, or taken from a cable-carrier datasheet, or computed from a declared service loop. A figure with no method is indistinguishable from a recalled one." },
+              "source": { "$ref": "#/$defs/source" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "service_loop_mm": { "type": "number", "exclusiveMinimum": 0, "description": "Slack deliberately left at the joint. Recorded because it is a design decision somebody made; NOT used in any derivation, because relating slack to permitted travel needs cable-bend-radius mechanics this repo does not model. Present so the number is already here when it is." },
+        "source": { "$ref": "#/$defs/source" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "source": {
+      "type": "object",
+      "required": ["citation"],
+      "properties": {
+        "citation": { "type": "string", "minLength": 1 },
+        "url": { "type": "string" },
+        "retrieved": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
