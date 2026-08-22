@@ -173,8 +173,9 @@ def test_limit_extremes_are_always_sampled():
 
 # --------------------------------------------------------- ADR-0004: static capacity
 
-def with_actuator(monkey_value):
+def with_actuator(monkey_value, volts=None):
     kin.load_actuator = lambda aid: monkey_value
+    kin.supply_volts = lambda robot_id: volts
 
 
 def single_joint(effort_nm=10.0, link_mass_g=0, tool_mass_g=0, arm_mm=100) -> dict:
@@ -252,13 +253,16 @@ def test_stall_only_actuator_makes_capacity_incomplete():
     robot["joints"][0].pop("limits")
     robot["joints"][0]["actuator_id"] = "xm430"
     original = kin.load_actuator
+    original_volts = kin.supply_volts
     with_actuator({"actuator_id": "xm430",
-                   "stall_torque_nm": {"value": 4.1, "at_volts": 12.0},
-                   "continuous_torque_nm": None})
+                   "stall_torque_nm": [{"value": 3.8, "at_volts": 11.1},
+                                       {"value": 4.1, "at_volts": 12.0},
+                                       {"value": 4.8, "at_volts": 14.8}],
+                   "continuous_torque_nm": None}, volts=12.0)
     try:
         verdict = kin.hold_verdict(robot, {"j1": 0}, 0)
     finally:
-        kin.load_actuator = original
+        kin.load_actuator, kin.supply_volts = original, original_volts
     assert verdict["verdict"] == "incomplete"
     assert "continuous_torque_nm" in verdict["detail"]
     assert "ADR-0004" in verdict["detail"]
@@ -270,15 +274,16 @@ def test_a_cited_continuous_torque_does_produce_an_answer():
     robot["joints"][0].pop("limits")
     robot["joints"][0]["actuator_id"] = "measured"
     robot["joints"][0]["gear_ratio"] = 2
-    original = kin.load_actuator
+    original, original_volts = kin.load_actuator, kin.supply_volts
     with_actuator({"actuator_id": "measured",
-                   "continuous_torque_nm": {"value": 1.0, "at_volts": 12.0,
-                                            "how_determined": "measured, 30 min to "
-                                                              "thermal steady state"}})
+                   "continuous_torque_nm": [{"value": 1.0, "at_volts": 12.0,
+                                             "how_determined": "measured, 30 min to "
+                                                               "thermal steady state"}]},
+                  volts=12.0)
     try:
         verdict = kin.hold_verdict(robot, {"j1": 0}, 0)
     finally:
-        kin.load_actuator = original
+        kin.load_actuator, kin.supply_volts = original, original_volts
     assert verdict["verdict"] == "holds"
     assert verdict["joints"][0]["capacity_nm"] == 2.0        # 1.0 N.m through 2:1
     assert abs(verdict["joints"][0]["static_load_nm"] - 0.4903) < 1e-3
@@ -293,6 +298,47 @@ def test_floating_base_refuses_to_assume_which_way_is_down():
     assert verdict["verdict"] == "incomplete"
     assert verdict["missing"] == "base orientation"
     assert "flat-ground figure" in verdict["detail"]
+
+
+# --------------------------------------------------- ADR-0014: the voltage is an index
+
+TWO_ROW = {"actuator_id": "two-row", "continuous_torque_nm": [
+    {"value": 1.0, "at_volts": 12.0, "how_determined": "datasheet continuous rating"},
+    {"value": 1.3, "at_volts": 14.8, "how_determined": "datasheet continuous rating"}]}
+
+
+def capacity_at(volts):
+    robot = single_joint()
+    robot["joints"][0].pop("limits")
+    robot["joints"][0]["actuator_id"] = "two-row"
+    original, original_volts = kin.load_actuator, kin.supply_volts
+    with_actuator(TWO_ROW, volts=volts)
+    try:
+        return kin.hold_verdict(robot, {"j1": 0}, 0)
+    finally:
+        kin.load_actuator, kin.supply_volts = original, original_volts
+
+
+def test_capacity_selects_the_row_matching_the_supply():
+    """30% apart. Picking the wrong row is wrong by the width of the curve."""
+    assert capacity_at(12.0)["joints"][0]["capacity_nm"] == 1.0
+    assert capacity_at(14.8)["joints"][0]["capacity_nm"] == 1.3
+
+
+def test_no_declared_supply_voltage_means_no_capacity_answer():
+    """Picking a row on the author's behalf is the invisible choice ADR-0014 removes."""
+    verdict = capacity_at(None)
+    assert verdict["verdict"] == "incomplete"
+    assert verdict["missing"] == "harness supply voltage"
+    assert "invisible choice" in verdict["detail"]
+
+
+def test_interpolation_between_published_rows_is_refused():
+    """13 V sits between 12.0 and 14.8. Approximately linear is still a model."""
+    verdict = capacity_at(13.0)
+    assert verdict["verdict"] == "incomplete"
+    assert "Interpolation is refused" in verdict["detail"]
+    assert "12.0" in verdict["detail"] and "14.8" in verdict["detail"]
 
 
 if __name__ == "__main__":

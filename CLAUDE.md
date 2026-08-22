@@ -46,13 +46,13 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 [`Knowledge/`](Knowledge/) is an LLM-maintained wiki. Its schema is [`Knowledge/CLAUDE.md`](Knowledge/CLAUDE.md) and it governs everything under that directory. Two rules matter most from outside it:
 
 - **Wiki pages are never evidence.** A number entering a schema, a data file or a computation cites a raw source, never a wiki page.
-- **The robotics pages are empty on purpose.** Filling them from recall would manufacture the exact uncited content the invariant refuses. `Knowledge/concepts/open-questions.md` is the reading list.
+- **The robotics pages were empty on purpose, and the rule that emptied them still stands.** Six sources were ingested on 2026-08-22 and seven of eight topics are answered; the last is gearbox efficiency, and it stays open because it would license a *number* rather than a *decision*. Filling a page from recall would manufacture the exact uncited content the invariant refuses. `Knowledge/concepts/open-questions.md` is the reading list.
 
 ## Status
 
-Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), thirteen ADRs, four
-stdlib scripts (`validate`, `kinematics`, `manifest`, `urdf`), 79 passing tests. `data/` is
-empty on purpose.
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), fourteen ADRs, four
+stdlib scripts (`validate`, `kinematics`, `manifest`, `urdf`), 84 passing tests. `data/` holds
+one real actuator record; no robot record yet, and that one needs hardware in hand.
 
 Do not write a README claim the code does not support. Equally: do not leave a status claim
 standing after the code has moved past it — this section said "no code" for exactly as long as

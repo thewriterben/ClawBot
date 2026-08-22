@@ -244,32 +244,50 @@ def test_floating_joint_with_limits_is_refused():
 def test_rule_of_thumb_continuous_torque_is_refused():
     """The exact failure ADR-0004 exists to prevent."""
     doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
-           "stall_torque_nm": {"value": 2.0, "at_volts": 6.0, "source": SRC},
-           "continuous_torque_nm": {"value": 0.6, "at_volts": 6.0,
-                                    "how_determined": "30% of stall torque, typical",
-                                    "source": SRC}}
+           "stall_torque_nm": [{"value": 2.0, "at_volts": 6.0, "source": SRC}],
+           "continuous_torque_nm": [{"value": 0.6, "at_volts": 6.0,
+                                     "how_determined": "30% of stall torque, typical",
+                                     "source": SRC}]}
     assert refuses(run("actuator", doc), "reads like a rule of thumb")
 
 
 def test_continuous_above_stall_is_refused():
     doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
-           "stall_torque_nm": {"value": 2.0, "at_volts": 6.0, "source": SRC},
-           "continuous_torque_nm": {"value": 3.0, "at_volts": 6.0,
-                                    "how_determined": "measured, held 10 min to steady state",
-                                    "source": SRC}}
+           "stall_torque_nm": [{"value": 2.0, "at_volts": 6.0, "source": SRC}],
+           "continuous_torque_nm": [{"value": 3.0, "at_volts": 6.0,
+                                     "how_determined": "measured, held 10 min to steady",
+                                     "source": SRC}]}
     assert refuses(run("actuator", doc), "not less than stall")
 
 
 def test_torque_without_voltage_is_refused():
     doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
-           "stall_torque_nm": {"value": 2.0, "source": SRC}}
+           "stall_torque_nm": [{"value": 2.0, "source": SRC}]}
     assert refuses(run("actuator", doc), "without its supply voltage")
 
 
+def test_scalar_torque_is_refused():
+    """ADR-0014: one point on a curve is not the figure."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
+           "stall_torque_nm": {"value": 2.0, "at_volts": 6.0, "source": SRC}}
+    assert refuses(run("actuator", doc), "is not an array")
+
+
+def test_two_rows_at_the_same_voltage_are_refused():
+    """The voltage is the index a derivation looks the row up by."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
+           "stall_torque_nm": [{"value": 2.0, "at_volts": 6.0, "source": SRC},
+                               {"value": 2.4, "at_volts": 6.0, "source": SRC}]}
+    assert refuses(run("actuator", doc), "two rows at 6.0 V")
+
+
 def test_stall_only_actuator_is_valid_and_warns():
-    """The XM430 case: a good datasheet, and capacity still underivable."""
+    """The XM430 case: a good datasheet, three voltages, and capacity still
+    underivable because not one of the three rows is a continuous rating."""
     doc = {"schema_version": 0, "actuator_id": "a", "type": "smart-servo", "source": SRC,
-           "stall_torque_nm": {"value": 4.1, "at_volts": 12.0, "source": SRC},
+           "stall_torque_nm": [{"value": 3.8, "at_volts": 11.1, "source": SRC},
+                               {"value": 4.1, "at_volts": 12.0, "source": SRC},
+                               {"value": 4.8, "at_volts": 14.8, "source": SRC}],
            "continuous_torque_nm": None}
     report = run("actuator", doc)
     assert report.failures == []

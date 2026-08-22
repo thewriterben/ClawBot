@@ -22,7 +22,10 @@
 - [x] Forward kinematics and a reachability answer that names its tool offset, its base frame, its sample count and seed, and says it is a joint-limit result rather than a collision result (ADR-0003) — `kinematics.py fk` / `reach`, 23 known-answer tests (2026-08-22)
 - [x] Static payload derivation from `continuous_torque_nm`, per-pose, labelled a static upper bound, torque taken about the real joint axis and loaded only by what hangs below it (ADR-0004). A floating base answers incomplete rather than assuming z-up (2026-08-22)
 - [x] URDF import/export against the boundary ADR-0007 defines — `urdf.py`, **19 tests that actually run the round trip**. Structure survives; provenance and absence do not, and both are proven rather than asserted (2026-08-22)
-- [ ] A first robot record. Still needs a real mechanism with real datasheets — a described-from-memory arm would be exactly the invented data the schema exists to refuse. The [[dynamixel-xm430]] reading means a first *actuator* record is now writable from a cited datasheet.
+- [x] **A first real record** — the ROBOTIS Dynamixel XM430-W350, from the vendor's own manual. `continuous_torque_nm` is null on a good datasheet from a vendor who names the distinction and then publishes only stall, so capacity over it is underivable: ADR-0004 working, not failing (2026-08-22)
+- [x] Fix the schema defect that record exposed — torque and speed are voltage-indexed **arrays**, not scalars wearing a voltage (ADR-0014). The XM430 spans 26% across its own rated range, and a derivation now selects the row matching `harness.power.supply_volts`, refuses to interpolate, and answers incomplete when no supply voltage is declared (2026-08-22)
+- [x] Close the actuator/parts boundary question against real records — OpenPartsCore's `electronic/sg90` carries identity, bus and capabilities and **no torque, speed or mass**. The split holds with zero overlap (2026-08-22)
+- [ ] A first **robot** record. Still needs a real mechanism with real datasheets — a described-from-memory arm would be exactly the invented data the schema exists to refuse. This is the one thing on this list that hardware, not effort, unblocks.
 - [ ] A Rust binding, following OpenPartsCore's codegen discipline, so Oh-Ben-Claw can read the body model without taking Python.
 - [ ] The affordance verdict ADR-0010 promised — a named request in, "this body can/cannot/incomplete" out. `reach` and `hold` are its two halves; nothing composes them yet.
 - [ ] Resolve the degrees/radians seam with Oh-Ben-Claw. `ServoAngle` is degrees; this repo and REP-103 are radians. ADR-0010 puts the conversion at one boundary and nothing enforces it yet.
@@ -36,9 +39,8 @@
 - Wheels, propellers, odometry and gait. ADR-0009 makes a moving base *expressible* — a `planar` joint says the base moves in a plane. It does not say how, and this repo does not model how.
 - A learned policy surface: action-space definitions, simulation export, dataset schemas. Rejected in ADR-0010 as a second product rather than a schema change, not as a bad idea. A real request pulls it forward.
 - Cable mechanics. `service_loop_mm` is recorded and feeds nothing, because relating slack to permitted travel needs bend-radius behaviour under load that has no source here (ADR-0012).
-- Dynamics, and the full inertia tensor URDF carries. ADR-0004 draws the line at static gravity load; the gap is recorded in `Knowledge/concepts/urdf-round-trip.md`.
-- Dynamics. ADR-0004 draws the line at static gravity load and says so in every answer.
-- Compliance, backlash, gearbox efficiency. Each turns an upper bound into an estimate, and each needs measured data.
+- Dynamics, and the full inertia tensor URDF carries. ADR-0004 draws the line at static gravity load and says so in every answer; the URDF gap is recorded in `Knowledge/concepts/urdf-round-trip.md`.
+- Compliance, backlash, gearbox efficiency. Each turns an upper bound into an estimate, and each needs measured data — and gearbox efficiency is the last open sourcing topic for exactly that reason.
 
 ## Not ever
 - A `reach_mm` field (ADR-0003).

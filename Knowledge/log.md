@@ -231,3 +231,69 @@ exactly as long as that was true, and `Knowledge/CLAUDE.md` said the robotics ha
 exactly one day. Both were corrected in the same change as the work that falsified them. The
 "empty half" section was rewritten rather than deleted, because the rule that emptied the
 directory still governs every page written into it.
+
+---
+
+## [2026-08-22] ingest | The first real record, and the schema it broke on contact
+
+`data/` stopped being empty. One actuator — the ROBOTIS Dynamixel XM430-W350, written from the
+vendor's own e-Manual — and it did what a first record is supposed to do, which is find
+something wrong.
+
+**The record exists mainly to demonstrate a refusal.** `continuous_torque_nm` is **null**, on a
+good datasheet, from a vendor who states the distinction outright: *"the given Stall torque
+rating for a servo is different from its continuous output rating."* ROBOTIS names it, publishes
+a performance graph, publishes three stall figures — and no continuous one. So capacity over
+this actuator is underivable and every `hold` answer naming it will say so. That is ADR-0004
+working, and it is worth restating that this was *predicted from reasoning* in ADR-0004 and is
+now *confirmed from a datasheet*.
+
+**What broke: ADR-0004 got the requirement right and the cardinality wrong.** It required
+`at_volts`, correctly, and then modelled voltage as an **annotation on a scalar** — one figure
+wearing the voltage it was measured at. The XM430 publishes **three rows**: 3.8 N·m at 11.1 V,
+4.1 at 12.0, 4.8 at 14.8, with three matching no-load speeds, from one table.
+
+The schema forced picking one. Three problems, worst last: it discards published evidence; the
+choice is invisible on the page; and the spread across this actuator's own rated range is
+**26%**, so a capacity derived from the wrong row is wrong by a fifth — and the direction that
+overstates is the one that cooks a servo. That is ADR-0004's own failure mode — a number true at
+one operating point and silently wrong at others — reappearing one level down, which is why the
+fix had to be the same kind of fix.
+
+**ADR-0014** makes torque and speed voltage-indexed arrays, and puts three refusals around the
+lookup. A derivation selects the row matching `harness.power.supply_volts`. **No declared supply
+voltage, no derivation** — picking a row on the author's behalf is the invisible choice this
+removes, and defaulting to the lowest "to be safe" is conservative in the wrong place, because
+it under-reports capacity and sends someone to buy a servo they did not need. **No matching row,
+no derivation**, naming what was asked for and what exists. And **interpolation is refused**:
+torque against voltage is approximately linear for a DC motor, "approximately" is a model, and
+an unsourced model's output would be indistinguishable on the page from a datasheet value.
+
+That creates a real coupling — a capacity answer now depends on the **harness** record, which it
+did not before. It is the correct coupling: supply voltage is a fact about the built machine,
+and the actuator's datasheet cannot know it. It also means one more thing reports incomplete,
+which is consistent with everything else here.
+
+**Open question 3 closed, against real records rather than argument.** The actuator/parts
+boundary had never met an entry on both sides. It has now: [[openpartscore]] already carries
+`electronic/sg90`, and that record holds id, description, source, `bus`, `capabilities`,
+`connector`, `compatible_boards` — and **no torque, no speed, no mass, no travel, no gearing, no
+feedback type**. The overlap in practice is zero. Upstream answers *what is this and how do you
+talk to it*; ClawBot answers *what does it do when you bolt it into a mechanism*.
+
+Two smaller findings from the same comparison. A servo lives in OPC's **`electronic`** namespace,
+not `mechanical` (its ADR-0005), so a ClawBot `part_id` for an actuator reads `electronic/...`.
+And `bus` now appears on both sides — not a conflict, because they answer different questions,
+but it is the field to watch.
+
+**Also: OPC has no entry for the XM430 at all**, so this record carries no `part_id`. Whether an
+uncatalogued actuator is a legitimate state or something the schema should require is a real
+question, and `manifest.py` already half-answers it by reporting uncatalogued parts separately
+rather than dropping them.
+
+**Lint pass on the top-level docs, since they were being edited anyway.** Three ADR citations in
+the README were wrong and had been since the scaffold: reach cited to ADR-0002 (which is the
+licence), payload to ADR-0003, and the DH argument to ADR-0004 — each off by one. Fixed, along
+with a duplicated line in ROADMAP's "Not yet". Worth noting the shape: a citation pointing at
+the wrong thing is exactly the failure this repo is built to prevent, and it was sitting in the
+file that explains the discipline.

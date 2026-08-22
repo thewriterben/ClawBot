@@ -52,11 +52,34 @@ stops.
 mandates radians. Two repos each correct in their own frame is how a mechanism gets commanded to
 57 times the intended angle. ADR-0010 puts the conversion at one boundary; nothing enforces it yet.
 
-### 3. The actuator/parts boundary is untested
+### 3. The actuator/parts boundary is untested — **CLOSED 2026-08-22, and the split holds**
 
-ClawBot's actuator schema carries make, model, mass and electrical fields that an [[openpartscore]] `mechanical` entry would plausibly also carry. The stated split — the registry holds *what the part is*, ClawBot holds *what it does in a mechanism* — is defensible and has never met a real entry.
+The stated split — the registry holds *what the part is*, ClawBot holds *what it does in a
+mechanism* — was defensible and had never met a real entry.
 
-**To falsify:** write one actuator both ways and see which fields genuinely have two homes.
+It has now. [[openpartscore]] already carries `electronic/sg90`, a hobby servo. What that record
+contains: id, name, description, source, and attributes `bus`, `capabilities`, `connector`,
+`compatible_boards`. What it does **not** contain: **no torque, no speed, no mass, no travel, no
+gearing, no feedback type.**
+
+So the overlap in practice is *zero*. OPC answers "what is this thing and how do you talk to
+it"; ClawBot answers "what does it do when you bolt it into a mechanism". The XM430 record
+written the same day carries torque at three voltages, gear ratio, travel and encoder type, and
+none of those fields has a home upstream.
+
+**Two smaller findings from the same comparison:**
+
+- A servo lives in OPC's **`electronic`** namespace, not `mechanical` — that is OPC ADR-0005
+  ("accessories are electronic parts"), and it means a ClawBot `part_id` for an actuator reads
+  `electronic/...`. Worth knowing before writing one.
+- `bus` appears on both sides — OPC's `attributes.bus` and ClawBot's `harness.channels.bus`.
+  Not yet a conflict, because they answer different questions (what the part speaks; what it is
+  wired to on this machine), but it is the one field to watch.
+
+**Still open, and now sharper:** OPC has no entry for the XM430 at all, so ClawBot's first
+record carries no `part_id`. Whether ClawBot records should *require* one, or whether an
+uncatalogued actuator is a legitimate state, is a real question the manifest emitter already
+half-answers by reporting uncatalogued parts separately rather than dropping them.
 
 ### 4. Radians in the file (ADR-0005) protects against one bug and invites another
 

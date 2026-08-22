@@ -300,32 +300,56 @@ def check_actuator(path: Path, report: Report) -> str | None:
             report.fail(where, f"missing required field '{field}'")
     check_source(report, where, "actuator", act.get("source"))
 
+    # Voltage-indexed arrays (ADR-0014). The voltage is the index, not an
+    # annotation, so a duplicate or missing one makes the row unlookupable.
     for field in ("stall_torque_nm", "continuous_torque_nm", "no_load_speed_rad_s"):
-        block = act.get(field)
-        if block and block.get("at_volts") is None:
-            report.fail(where, f"{field} has no at_volts; a torque or speed figure "
-                               f"without its supply voltage is not a figure")
+        rows = act.get(field)
+        if rows is None:
+            continue
+        if not isinstance(rows, list):
+            report.fail(where, f"{field} is not an array. Torque against voltage is a "
+                               f"curve and one point on it is not the figure (ADR-0014)")
+            continue
+        seen_volts = set()
+        for row in rows:
+            volts = row.get("at_volts")
+            if volts is None:
+                report.fail(where, f"{field} row has no at_volts; a torque or speed "
+                                   f"figure without its supply voltage is not a figure")
+            elif volts in seen_volts:
+                report.fail(where, f"{field} has two rows at {volts} V — the voltage "
+                                   f"is the index a derivation looks the row up by")
+            else:
+                seen_volts.add(volts)
 
+    # Guarded: a non-list here was already reported above, and iterating a dict
+    # would yield its keys and crash on the next .get().
     cont = act.get("continuous_torque_nm")
-    if cont:
-        how = (cont.get("how_determined") or "").strip()
+    cont = cont if isinstance(cont, list) else []
+    stall_rows = act.get("stall_torque_nm")
+    stall = {r.get("at_volts"): r.get("value")
+             for r in (stall_rows if isinstance(stall_rows, list) else [])}
+    for row in cont:
+        volts = row.get("at_volts")
+        how = (row.get("how_determined") or "").strip()
         if not how:
-            report.fail(where, "continuous_torque_nm has no how_determined (ADR-0004)")
+            report.fail(where, f"continuous_torque_nm at {volts} V has no "
+                               f"how_determined (ADR-0004)")
         elif RULE_OF_THUMB.search(how):
             report.fail(
                 where,
-                f"continuous_torque_nm.how_determined reads like a rule of thumb "
-                f"({how!r}). ADR-0004: only a datasheet continuous rating or a "
-                f"measurement with its method. A fraction of stall torque is a guess "
-                f"wearing a citation",
+                f"continuous_torque_nm at {volts} V has a how_determined that reads "
+                f"like a rule of thumb ({how!r}). ADR-0004: only a datasheet continuous "
+                f"rating or a measurement with its method. A fraction of stall torque "
+                f"is a guess wearing a citation",
             )
-        if not cont.get("thermal_basis"):
-            report.warn(where, "continuous_torque_nm has no thermal_basis — a torque "
-                               "held for ten seconds is not a continuous torque")
-        stall = act.get("stall_torque_nm")
-        if stall and cont.get("value", 0) >= stall.get("value", 0):
-            report.fail(where, "continuous_torque_nm is not less than stall_torque_nm")
-    elif act.get("stall_torque_nm"):
+        if not row.get("thermal_basis"):
+            report.warn(where, f"continuous_torque_nm at {volts} V has no thermal_basis "
+                               f"— a torque held for ten seconds is not a continuous one")
+        if volts in stall and row.get("value", 0) >= stall[volts]:
+            report.fail(where, f"continuous_torque_nm at {volts} V is not less than "
+                               f"stall_torque_nm at the same voltage")
+    if not cont and act.get("stall_torque_nm"):
         report.warn(where, "stall torque only, continuous is null: capacity is "
                            "underivable and that is the honest answer (ADR-0004)")
 

@@ -4,18 +4,21 @@
     "The field worth staring at is continuous_torque_nm: it is null here, and it will be null",
     "for most real hobby servos too, because datasheets publish stall torque instead. Null is the",
     "honest answer and it makes capacity underivable. Do not fill it in with a fraction of stall",
-    "torque; how_determined exists to reject that (ADR-0004)."
+    "torque; how_determined exists to reject that (ADR-0004).",
+    "The torque and speed fields are ARRAYS because torque against voltage is a curve and one",
+    "point on it is not the figure (ADR-0014). Two rows are shown to make that obvious; a",
+    "single-voltage datasheet records a one-element array. A capacity derivation selects the row",
+    "matching the harness supply voltage, and answers incomplete rather than picking one for you."
   ],
 
   "schema_version": 0,
   "actuator_id": "template-servo",
   "type": "hobby-servo",
 
-  "stall_torque_nm": {
-    "value": 1,
-    "at_volts": 1,
-    "source": { "citation": "TODO(source)" }
-  },
+  "stall_torque_nm": [
+    { "value": 1, "at_volts": 1, "source": { "citation": "TODO(source)" } },
+    { "value": 1, "at_volts": 2, "source": { "citation": "TODO(source)" } }
+  ],
 
   "continuous_torque_nm": null,
 

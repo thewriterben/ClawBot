@@ -2,7 +2,7 @@
 
 Describe a robot once — links, joints, actuators, and where every number came from. Then ask what it can actually reach, and what it can actually hold there.
 
-**Status:** pre-alpha. Four schemas, thirteen ADRs, four scripts, **79 passing tests**, and a knowledge base whose robotics half is no longer empty. `data/` is still empty on purpose — a first robot record needs a real mechanism with real datasheets, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
+**Status:** pre-alpha. Four schemas, fourteen ADRs, four scripts, **84 passing tests**, and a knowledge base whose robotics half is no longer empty. `data/` holds one real record — a Dynamixel XM430-W350, written from the vendor's own manual, whose continuous torque is `null` because ROBOTIS names the stall/continuous distinction and then publishes only stall. No robot record yet: that needs a real mechanism in hand, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
 
 ```
 python scripts/validate.py                     # uncited claims, degrees in _rad, non-trees
@@ -10,10 +10,10 @@ python scripts/kinematics.py reach <id>        # sampled workspace, with every a
 python scripts/kinematics.py hold <id> --pose  # static capacity, labelled an upper bound
 python scripts/manifest.py <id> --as-project   # the bill of parts, in OBC's vocabulary
 python scripts/urdf.py import <file.urdf>      # reads the XML, not the parsed tree
-python -m pytest tests/ -q                     # 79 tests
+python -m pytest tests/ -q                     # 84 tests
 ```
 
-The tests are the interesting part. 29 are negative — every rule with teeth, proven to bite. 23 are known answers rather than pinned outputs: a 1 kg mass on a 100 mm arm loads the joint with 0.980665 N⋅m whether or not this code has ever run. 19 run the URDF round trip that [ADR-0007](DECISIONS.md) makes claims about. And two validate emitted output against **OpenBuildCore's own schema file**, not a copy of it — skipping honestly if that repo is not checked out beside this one.
+The tests are the interesting part. 31 are negative — every rule with teeth, proven to bite. 26 are known answers rather than pinned outputs: a 1 kg mass on a 100 mm arm loads the joint with 0.980665 N⋅m whether or not this code has ever run. 19 run the URDF round trip that [ADR-0007](DECISIONS.md) makes claims about. And two validate emitted output against **OpenBuildCore's own schema file**, not a copy of it — skipping honestly if that repo is not checked out beside this one.
 
 ## Where it sits
 
@@ -27,7 +27,7 @@ Fifth peer in the platform (OpenDesignCore ADR-0007):
 | [OpenDesignCore](https://github.com/thewriterben/OpenDesignCore) | the geometry, validated and provenance-carrying |
 | **ClawBot** | the thing that moves — links, joints, actuators, and what they can reach |
 
-Like its peers, ClawBot **imports nothing from them**. A link references an OpenPartsCore `part_id`; a fabricated link references an OpenDesignCore provenance record. The peers meet at data that already had to exist, not at an API (ADR-0005).
+Like its peers, ClawBot **imports nothing from them**. A link references an OpenPartsCore `part_id`; a fabricated link references an OpenDesignCore provenance record. The peers meet at data that already had to exist, not at an API (ADR-0006).
 
 ## Why a fifth repo, and not a machine kind in OpenBuildCore
 
@@ -41,7 +41,7 @@ OBC already models machines you own — envelope, materials, throughput (its ADR
 
 ## What a robot record says
 
-A robot is a tree of **links** connected by **joints**, driven by **actuators**. The shape follows URDF rather than Denavit–Hartenberg parameters, because DH has two incompatible conventions in common use and a table of four numbers does not say which one it is (ADR-0004).
+A robot is a tree of **links** connected by **joints**, driven by **actuators**. The shape follows URDF rather than Denavit–Hartenberg parameters, because DH has two incompatible conventions in common use and a table of four numbers does not say which one it is (ADR-0005) — and, it turned out on reading the sources, because a DH table cannot carry the tool transform or branch at all (ADR-0007).
 
 ```
 robot
@@ -71,11 +71,11 @@ mechanism on a moving base is describable — and every derived answer is explic
 
 Every record needs a `source.citation`, the same gate the reference registry uses. A joint limit is a physical claim about hardware.
 
-## The two rules with teeth
+## The rules with teeth
 
-**Reach is derived, never declared** (ADR-0002). A vendor's "850 mm reach" is a radius to some unstated frame, before a tool, ignoring self-collision and the joint limits that make parts of that sphere unreachable. ClawBot will not carry a `reach_mm` field, because a number that looks like a measurement and is actually a marketing figure is worse than no number. Reach is computed from the joint model, or the answer is that the model is incomplete and which joint is missing.
+**Reach is derived, never declared** (ADR-0003). A vendor's "850 mm reach" is a radius to some unstated frame, before a tool, ignoring self-collision and the joint limits that make parts of that sphere unreachable. ClawBot will not carry a `reach_mm` field, because a number that looks like a measurement and is actually a marketing figure is worse than no number. Reach is computed from the joint model, or the answer is that the model is incomplete and which joint is missing.
 
-**Payload is a function of pose** (ADR-0003). A payload figure is accepted only as a `measured_payload` that names the pose it was measured at and how. Otherwise capacity is derived from actuator effort limits and geometry, and reported per-pose. Absence of a payload answer is the honest default.
+**Payload is a function of pose** (ADR-0004). A payload figure is accepted only as a `measured_payload` that names the pose it was measured at and how. Otherwise capacity is derived from actuator effort limits and geometry, and reported per-pose. Absence of a payload answer is the honest default.
 
 Both are the same discipline OpenBuildCore applied to print time: *if nobody measured it, and it cannot be derived from something that was, the answer is "I cannot tell you"* — which is less useful than a number and more useful than a wrong one.
 

@@ -348,7 +348,17 @@ def reach_verdict(robot: dict, target, tolerance_mm: float,
 
 # ---------------------------------------------------------------- static capacity
 
-def joint_capacity_nm(joint: dict) -> float:
+def supply_volts(robot_id: str) -> float | None:
+    """From the harness, because the supply voltage is a fact about the built machine
+    and the actuator's datasheet cannot know it (ADR-0014)."""
+    for path in sorted((ROOT / "data" / "harnesses").glob("*.json")):
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        if doc.get("robot_id") == robot_id:
+            return (doc.get("power") or {}).get("supply_volts")
+    return None
+
+
+def joint_capacity_nm(joint: dict, volts: float | None) -> float:
     """The lesser of what the motor sustains and what the joint is allowed to produce."""
     jid = joint["joint_id"]
     available = []
@@ -363,14 +373,30 @@ def joint_capacity_nm(joint: dict) -> float:
         if actuator is None:
             raise Incomplete(f"joint '{jid}'",
                              f"actuator '{aid}' is not in data/actuators/")
-        cont = actuator.get("continuous_torque_nm")
-        if not cont:
+        rows = actuator.get("continuous_torque_nm")
+        if not rows:
             raise Incomplete(
                 f"actuator '{aid}'",
                 "no continuous_torque_nm. Most datasheets publish stall torque and "
                 "nothing else — including good ones. Stall may not feed a capacity "
                 "derivation (ADR-0004), and a fraction of it is a guess.")
-        available.append(cont["value"] * (joint.get("gear_ratio") or 1))
+        if volts is None:
+            raise Incomplete(
+                "harness supply voltage",
+                f"actuator '{aid}' publishes continuous torque at "
+                f"{', '.join(str(r['at_volts']) for r in rows)} V and no harness "
+                f"declares power.supply_volts for this robot. Picking a row would be "
+                f"an invisible choice, and picking the lowest 'to be safe' "
+                f"under-reports capacity (ADR-0014).")
+        match = [r for r in rows if abs(r["at_volts"] - volts) < 1e-9]
+        if not match:
+            raise Incomplete(
+                f"actuator '{aid}' at {volts} V",
+                f"published rows are at {', '.join(str(r['at_volts']) for r in rows)} V. "
+                f"Interpolation is refused: torque against voltage is approximately "
+                f"linear and 'approximately' is an unsourced model whose output would "
+                f"be indistinguishable from a datasheet value (ADR-0014).")
+        available.append(match[0]["value"] * (joint.get("gear_ratio") or 1))
 
     if not available:
         raise Incomplete(f"joint '{jid}'",
@@ -394,11 +420,13 @@ def descendants(robot: dict, link_id: str) -> set:
 
 def hold_verdict(robot: dict, pose: dict, payload_g: float) -> dict:
     """Static gravity load per joint. An upper bound, and it says so (ADR-0004)."""
+    volts = supply_volts(robot.get("robot_id"))
     base = {
         "robot_id": robot.get("robot_id"),
         "relative_to": robot["base_link"],
         "pose": {k: round(v, 6) for k, v in sorted(pose.items())},
         "payload_g": payload_g,
+        "supply_volts": volts,
     }
 
     if any(j.get("type") in UNDETERMINED for j in robot.get("joints", [])):
@@ -452,7 +480,7 @@ def hold_verdict(robot: dict, pose: dict, payload_g: float) -> dict:
             continue
         jid = joint["joint_id"]
         try:
-            capacity = joint_capacity_nm(joint)
+            capacity = joint_capacity_nm(joint, volts)
         except Incomplete as exc:
             return dict(base, verdict="incomplete", missing=exc.missing, detail=exc.detail)
 

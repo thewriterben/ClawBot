@@ -17,44 +17,39 @@
     },
 
     "stall_torque_nm": {
-      "type": ["object", "null"],
-      "description": "The datasheet headline. Recorded because datasheets publish it and omitting the field invites someone to write it into continuous_torque_nm, NOT because it is usable. A validator must refuse to let this value reach a capacity derivation (ADR-0004).",
-      "required": ["value", "at_volts"],
-      "properties": {
-        "value": { "type": "number", "exclusiveMinimum": 0 },
-        "at_volts": { "type": "number", "exclusiveMinimum": 0, "description": "Required. A torque figure without its supply voltage is not a figure - the same servo quoted at 6.0 V and 7.4 V differs substantially." },
-        "source": { "$ref": "#/$defs/source" }
-      },
-      "additionalProperties": false
+      "type": ["array", "null"],
+      "description": "The datasheet headline, as a CURVE SAMPLED AT VOLTAGES rather than one figure (ADR-0014). Recorded because datasheets publish it and omitting the field invites someone to write it into continuous_torque_nm, NOT because it is usable. A validator must refuse to let these values reach a capacity derivation (ADR-0004).",
+      "items": { "$ref": "#/$defs/torqueAtVolts" },
+      "minItems": 1
     },
 
     "continuous_torque_nm": {
-      "type": ["object", "null"],
-      "description": "The only torque that may feed a capacity derivation. Absent means capacity cannot be derived and the answer is 'incomplete', naming this actuator - the same shape as OpenBuildCore answering 'requires slicing' for a machine with no measured throughput (its ADR-0005). Most hobby datasheets do not publish this, so absence will be the common case; that is a true statement about the available evidence, not a gap to be filled with a fraction of stall torque.",
-      "required": ["value", "at_volts", "how_determined"],
-      "properties": {
-        "value": { "type": "number", "exclusiveMinimum": 0 },
-        "at_volts": { "type": "number", "exclusiveMinimum": 0 },
-        "how_determined": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Datasheet continuous rating, or a measurement and its method. A rule of thumb applied to stall torque is not a determination and must be rejected here - it is a guess wearing a citation."
+      "type": ["array", "null"],
+      "description": "The only torque that may feed a capacity derivation, and an array for the reason ADR-0014 gives: torque against voltage is a curve, and this actuator's own rated range can span 26%. Null means capacity cannot be derived and the answer is 'incomplete', naming this actuator - the same shape as OpenBuildCore answering 'requires slicing' for a machine with no measured throughput (its ADR-0005). Most hobby datasheets do not publish this, so null will be the common case; that is a true statement about the available evidence, not a gap to be filled with a fraction of stall torque.",
+      "items": {
+        "type": "object",
+        "required": ["value", "at_volts", "how_determined"],
+        "properties": {
+          "value": { "type": "number", "exclusiveMinimum": 0 },
+          "at_volts": { "type": "number", "exclusiveMinimum": 0 },
+          "how_determined": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Datasheet continuous rating, or a measurement and its method. A rule of thumb applied to stall torque is not a determination and must be rejected here - it is a guess wearing a citation."
+          },
+          "thermal_basis": { "type": "string", "description": "Duty cycle, ambient, and whether steady state was reached. A torque held for ten seconds is not a continuous torque." },
+          "source": { "$ref": "#/$defs/source" }
         },
-        "thermal_basis": { "type": "string", "description": "Duty cycle, ambient, and whether steady state was reached. A torque held for ten seconds is not a continuous torque." },
-        "source": { "$ref": "#/$defs/source" }
+        "additionalProperties": false
       },
-      "additionalProperties": false
+      "minItems": 1
     },
 
     "no_load_speed_rad_s": {
-      "type": ["object", "null"],
-      "required": ["value", "at_volts"],
-      "properties": {
-        "value": { "type": "number", "exclusiveMinimum": 0 },
-        "at_volts": { "type": "number", "exclusiveMinimum": 0 },
-        "source": { "$ref": "#/$defs/source" }
-      },
-      "additionalProperties": false
+      "type": ["array", "null"],
+      "description": "Also voltage-indexed (ADR-0014): the same datasheet that publishes three torque rows publishes three speed rows, from the same table.",
+      "items": { "$ref": "#/$defs/torqueAtVolts" },
+      "minItems": 1
     },
 
     "travel": {
@@ -110,6 +105,18 @@
   "additionalProperties": false,
 
   "$defs": {
+    "torqueAtVolts": {
+      "type": "object",
+      "description": "One row of a published table. Voltage is not an annotation on the value - it is the index the value is looked up by, and a derivation that picks the wrong row is wrong by the width of the curve (ADR-0014).",
+      "required": ["value", "at_volts"],
+      "properties": {
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "at_volts": { "type": "number", "exclusiveMinimum": 0, "description": "Required. A torque or speed figure without its supply voltage is not a figure - the same servo quoted at 6.0 V and 7.4 V differs substantially, and the XM430 spans 26% across its own rated range." },
+        "at_amps": { "type": "number", "exclusiveMinimum": 0, "description": "Current drawn at this row, where the datasheet states it. Sizing a supply from no-load current is how a mechanism browns out the moment it takes a load." },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
     "source": {
       "type": "object",
       "required": ["citation"],

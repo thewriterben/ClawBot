@@ -5,14 +5,14 @@ Catalogue of every page in this wiki. Read this first when answering a question,
 ## Concepts
 - [[ecosystem-position]] — the five peers, the seam they meet at, and the six boundaries ClawBot must not cross (2026-08-22)
 - [[inherited-invariants]] — the nine rules ClawBot did not invent and may not quietly drop, each traced to where it came from (2026-08-22)
-- [[open-questions]] — decisions made without evidence, and the reading list that fills the empty half. Two questions closed and four sourcing topics answered (2026-08-22)
+- [[open-questions]] — decisions made without evidence, and the reading list. Three questions closed and seven of eight sourcing topics answered (2026-08-22)
 - [[urdf-round-trip]] — what reading the URDF spec cost ADR-0005: structure maps both ways, absence maps neither (2026-08-22)
 
 ## Entities
-- [[clawbot]] — this repo; the mechanism peer, defined mostly by two refusals
+- [[clawbot]] — this repo; the mechanism peer, defined mostly by what it refuses to answer
 - [[openbuildcore]] — inventory, machines, three requirement kinds; the closest prior art and the source of most inherited discipline
 - [[opendesigncore]] — the provenance record, the platform decisions, and the wiki pattern this one matches
-- [[openpartscore]] — the canonical parts registry; where an actuator's facts belong
+- [[openpartscore]] — the canonical parts registry. Its `electronic/sg90` proved the actuator boundary: identity, bus and capabilities upstream; torque, speed and travel here
 - [[oh-ben-claw]] — the embodied runtime; likely consumer, confirmed to have no robot model of its own
 
 **Not yet written**, because nothing has been read: OpenCircuitCore, ClawCam, Project BINGO. See [[open-questions]].
@@ -49,7 +49,7 @@ volume is a boundary claim in disguise.
 
 ## Counts
 
-4 concepts, 5 entities, 9 source summaries. 1 raw source copied locally; the rest cited by
+4 concepts, 5 entities, 9 source summaries. One real record in `data/`, cited to a vendor manual. 1 raw source copied locally; the rest cited by
 repo-relative path or by URL with a retrieval date.
 
 Evidence quality is not uniform and the pages say so individually. The URDF pages rest on a

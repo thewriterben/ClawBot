@@ -592,3 +592,77 @@ Rejected: bounding-box broad-phase self-collision using `make` link sizes. It wo
 adjacent links constantly — they share a joint — and its silence would be indistinguishable
 from real clearance. A collision check that cannot tell "clear" from "not checked" is worse than
 none, because the first is a claim.
+
+---
+
+## ADR-0014 — A torque figure is a curve sampled at voltages, and the derivation must say which sample it used
+
+**Date:** 2026-08-22
+**Status:** accepted (refines ADR-0004; found by first contact with a real datasheet)
+
+**Context.** ADR-0004 made `at_volts` required, with the reasoning that "the same servo quoted
+at 6.0 V and 7.4 V differs substantially". That was right, and the shape it produced was wrong.
+It modelled voltage as an **annotation on a scalar** — one torque figure, wearing the voltage it
+was measured at.
+
+Writing the first real actuator record broke it immediately. The ROBOTIS Dynamixel XM430-W350
+publishes stall torque at **three** voltages — 3.8 N·m at 11.1 V, 4.1 at 12.0, 4.8 at 14.8 —
+with three matching no-load speeds. That is not an unusual datasheet. It is what a competent
+vendor publishes, because torque against voltage is a curve and one point on it is not the
+figure.
+
+The schema forced a choice of one row. Three things are wrong with that, in increasing order of
+severity:
+
+1. **It discards published evidence.** Two of the three rows have nowhere to go, and they came
+   from the same table as the one that was kept.
+2. **The choice is invisible.** A record showing 4.1 N·m at 12.0 V looks complete. Nothing on
+   the page says the vendor also published 4.8 at 14.8, or that somebody picked.
+3. **It silently mismatches the supply.** The spread across this actuator's own rated range is
+   **26%**. A capacity derived from the 11.1 V row on a mechanism running 14.8 V understates by
+   a fifth; the reverse overstates by a fifth, which is the direction that cooks a servo. Both
+   failures look exactly like a correct answer.
+
+The third is the one that matters, because it is ADR-0004's own failure mode — a number true at
+one operating point and silently wrong at others — reappearing one level down. ADR-0004 deleted
+`payload_kg` because capacity varies with pose. Torque varies with voltage for the same kind of
+reason, and the fix has to be the same kind of fix.
+
+**Decision.** `stall_torque_nm`, `continuous_torque_nm` and `no_load_speed_rad_s` become
+**arrays** of voltage-indexed measurements. A single-voltage datasheet records a one-element
+array; nothing is lost and the shape stops lying about what is known.
+
+- A capacity derivation **selects the row matching the supply voltage**, which comes from
+  `harness.power.supply_volts`.
+- **No supply voltage declared, no derivation.** The answer is "incomplete", naming the harness.
+  Picking a row on the author's behalf — the nominal one, the lowest one, the first one — is the
+  invisible choice this ADR exists to remove, and defaulting to the lowest "to be safe" is
+  conservative in the wrong place: it under-reports capacity, which sends someone to buy a bigger
+  servo they did not need.
+- **No matching row, no derivation.** The answer names the voltage that was asked for and the
+  voltages that exist.
+- **Interpolation is refused.** A supply at 13.0 V between published rows at 12.0 and 14.8 does
+  not get a computed figure. Torque against voltage is approximately linear for a DC motor and
+  "approximately" is a model — an unsourced one, whose output would be indistinguishable on the
+  page from a datasheet value. If a sourced motor model ever arrives, this is the line to revisit,
+  and it needs its own ADR.
+
+**Consequences.** The array is more verbose for the common single-row case and that is accepted.
+The alternative — allowing either a bare object or an array — means two shapes to validate, two
+shapes to read, and a branch in every consumer, to save a pair of brackets.
+
+**A derivation now depends on the harness**, which it did not before. That is a real coupling
+between two records and it is the correct one: the supply voltage is a fact about the built
+machine, not about the actuator, and the actuator's datasheet cannot know it. It also means a
+robot with no harness record gets no capacity answer, which is one more thing that will report
+incomplete. Consistent with the rest of the repo, and the reason the harness schema exists.
+
+**This is the schema being corrected by data rather than by argument**, which is the outcome
+inherited invariant #8 is fishing for. ADR-0004 reasoned its way to requiring `at_volts` and got
+the requirement right and the cardinality wrong. One datasheet found it. The general lesson is
+the one PD-1 paid four hours for and ADR-0007 paid a day for: a shape that has never met real
+data is a hypothesis.
+
+Rejected: keeping a scalar and adding a separate `torque_curve` array beside it. It would leave
+two places for the same fact and a question about which one wins — the registry-drift shape the
+platform exists to end, in miniature, inside one record.
