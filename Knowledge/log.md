@@ -23,3 +23,77 @@ Started from an empty directory containing an empty `Knowledge/`. Two instructio
 **Self-audit against the platform's own rules, since [[inherited-invariants]] was written the same day.** ClawBot is in breach of #8: ADR-0005 chose a URDF-shaped tree over DH parameters without running a single conversion, which is exactly what PD-1 cost four hours to learn. It is question 1 in [[open-questions]] with a concrete falsification — round-trip a real URDF and see what does not survive.
 
 Created: 6 ADRs, 2 JSON Schemas, 2 deliberately-placeholder templates (every dimension a `1`, every citation `TODO(source)`, copying OBC's K2 Plus discipline), 11 wiki pages, and 3 `TODO(source)` markers that all say the same thing — nobody has asked for this repo yet, and ADR-0001 admits it.
+
+---
+
+## [2026-08-22] ingest | The empty half, filled by a quarter — and ADR-0005's consequences retracted
+
+Four robotics sources read, four ADRs written, the schema corrected in three places. The
+repo's highest-priority self-recorded breach is closed.
+
+**What was read.** The `urdfdom` XSD; the reference parser's `joint.cpp`; REP-103; Corke's 2007
+paper on DH assignment; the ROBOTIS Dynamixel XM430-W350 manual. None copied into
+`raw/robotics/` — each has a stable home, and a second copy is a copy that drifts. Cited with
+retrieval dates instead, because unlike a sibling repo a URL is not under version control.
+
+**The finding that mattered, and it was not the one predicted.** [[open-questions]] guessed the
+URDF round trip would break on `mimic`, multiple geometries, xacro, inertial frames. All real,
+all minor. The actual break is **absence**. `urdfdom` will not parse a revolute joint with no
+`limit` element — so a ClawBot record in exactly the state ADR-0003 exists to handle has *no
+valid URDF at all*. And in the other direction, missing bounds default to `0` and a missing axis
+defaults to `(1,0,0)`, silently, so the parse is where absence gets destroyed.
+
+That is invariant #3 inverted, living inside the interchange format this repo chose to speak.
+ADR-0007 makes the converter a boundary with an explicit absence rule each way: export refuses
+and names the joint rather than emitting a zero, and the importer reads the XML rather than the
+parsed tree, because no importer built on `urdf_parser` can be correct.
+
+**ADR-0005 survives, better armed.** Its *decision* stands. Its consequences sentence — "a
+mapping rather than a reinterpretation" — is retracted. Meanwhile [[dh-conventions]] handed the
+ADR three arguments it never made: the zero-angle offsets are a second undeclared variable; the
+base and tool transforms fall out of a DH factorisation as *residue*, which is fatal for a repo
+whose ADR-0003 makes the tool offset load-bearing; and DH cannot branch at all.
+
+**A contradiction found in the schema, not in the sources.** `kind` said "open serial chains
+only" while `joints` said "must be a tree rooted at base_link". A tree branches. Both were
+written the same day. ADR-0008 keeps the tree rule, withdraws the enum's claim, and separates
+*label* from *topology constraint* — then adds `mimic`, which splits "closed chains" into the
+cheap 80% (coupled joints on a tree: parallel jaws, differentials) and the expensive 20% (true
+loops, still refused). A parallel gripper — the most likely first thing anyone would describe —
+was previously inexpressible because of loops it does not have.
+
+**Scope, revisited on evidence rather than taste.** ADR-0009 adopts URDF's full six joint types.
+The realisation that unlocked it: a moving base only breaks reachability if reach is a *world*
+claim, and ADR-0003 already refuses to make it one. Every answer is relative to `base_link`, and
+now says so. The sharp consequence is gravity — a static capacity derivation on a floating base
+must take a declared base orientation or answer incomplete, because assuming z-up would
+reintroduce the exact "true at one configuration" failure ADR-0004 deleted `payload_kg` to
+prevent, through the base instead of the pose.
+
+**Where control stops.** ADR-0010, written after confirming [[oh-ben-claw]] has **no robot
+model** — `obc-movement` is a flat `ServoAngle { name, channel, angle }` map with no notion that
+one channel is downstream of another. So ADR-0001's second rejection was argued against a repo
+that had not solved this. ClawBot takes the body model, the derivations over it, and an
+affordance verdict; the loop stays behind Track 0. The dividing line is not *how much control*
+but *what the answer is derived from*: cited hardware data and geometry on one side, the world
+right now on the other.
+
+**Rejected.** Emitting a Track 0 limit table in Oh-Ben-Claw's own config format — tempting,
+since ClawBot's limits are cited and Track 0's are hand-typed, but writing another repo's config
+takes its format as a dependency, which is the coupling ADR-0006 exists to prevent. Also
+rejected: a `closed_chain` boolean meaning "this record approximates a loop" — a flag that says
+the data is wrong is not better than refusing the data. Also deferred: the learned-policy
+surface (action spaces, sim export, dataset schemas), which is a second product rather than a
+schema change.
+
+**Found and not yet fixed.** `MovementCommand::ServoAngle` is in **degrees**; ClawBot and
+REP-103 are both radians. ADR-0010 puts the conversion at one boundary. Nothing enforces it,
+because there is still no code.
+
+**The one that keeps being true.** ADR-0004 predicted most actuators would have no usable torque
+figure. The XM430 is a well-documented smart servo whose manual explicitly says "the given Stall
+torque rating for a servo is different from its continuous output rating" — and then publishes
+three stall figures and no continuous one. The prediction was made from reasoning; it is now
+confirmed from a datasheet. The 30-50%-of-stall rule of thumb exists in the trade press and
+stays refused: the range spans a factor of 1.67, so choosing a point in it is a guess, and
+`how_determined` exists to reject exactly that.

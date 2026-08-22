@@ -128,3 +128,261 @@ The question is what a `link` points at. The wrong answer is an API: ClawBot imp
 **Consequences.** ClawBot's dependency list stays empty and its records stay readable by anything. The cost is that ClawBot alone cannot tell you whether a robot is buildable — it can only emit the list that OBC answers that question about. That division is correct: ClawBot knows what the robot is made of, OBC knows what you have.
 
 Three kinds is the ceiling, for the reason OBC gave. A fourth — salvaged from an existing mechanism, say — needs a real case and its own ADR.
+
+---
+
+## ADR-0007 — The URDF boundary: structure survives the round trip, absence does not
+
+**Date:** 2026-08-22
+**Status:** accepted (amends the consequences of ADR-0005; does not disturb its decision)
+
+**Context.** ADR-0005 justified a URDF-shaped tree with a claim about a converter nobody had
+written: *"structurally URDF, so a converter is a mapping rather than a reinterpretation."*
+[`Knowledge/concepts/inherited-invariants.md`](Knowledge/concepts/inherited-invariants.md) #8
+recorded that as a breach the day it was made — kernel choices get installed and run before
+they are recorded, and this one had not been run. It was question 1 in the open-questions
+list.
+
+The sources have now been read: the `urdfdom` XSD, the reference parser's `joint.cpp`, and
+REP-103. The findings are written up in
+[`Knowledge/concepts/urdf-round-trip.md`](Knowledge/concepts/urdf-round-trip.md). Two of them
+bite.
+
+**Export.** `urdfdom` **refuses to parse a revolute or prismatic joint with no `limit`
+element**, and within a `limit`, a missing `effort` or `velocity` is fatal. So a ClawBot record
+in precisely the state ADR-0003 exists to handle — a real mechanism whose joint travel nobody
+has sourced — has **no valid URDF representation at all**. The format cannot say "unknown".
+
+**Import.** The mirror, and worse because it is silent. Inside a `limit`, missing `lower` and
+`upper` default to `0` with a debug log; a joint with no `axis` defaults to `(1, 0, 0)`. So
+`<limit effort="10" velocity="1"/>` parses cleanly into a joint **locked at zero**, and nothing
+in the parsed tree distinguishes that from a joint somebody deliberately locked. URDF's
+defaults turn absence into a specific plausible value, which is
+[inherited invariant #3](Knowledge/concepts/inherited-invariants.md) inverted, sitting inside
+the interchange format this repo chose.
+
+**Decision.** The converter is a boundary with an explicit absence rule in each direction, not
+a mapping.
+
+- **Export refuses rather than defaults.** A robot with any joint whose `limits` are null does
+  not export; the failure names the joint. Emitting `lower="0" upper="0"` was considered and
+  rejected — it manufactures a physical claim, which is the one thing this repo may never do.
+  Emitting a wide default was rejected for over-claiming in the direction ADR-0003 already
+  regrets. **URDF export is therefore partial by construction:** a fully-sourced robot exports,
+  an honest incomplete one does not, and that is the correct asymmetry.
+- **Import reads the XML, not the parsed tree.** The parse is where absence is destroyed, so an
+  importer built on `urdf_parser` cannot be correct no matter how carefully it is written. An
+  attribute not present in the document imports as absent.
+- **A value the format defaulted is recorded as such.** Where an import must fill something in
+  to proceed, `source.citation` says the format supplied it — not the author. A defaulted axis
+  is a guess, and it is labelled one.
+- **Lengths convert at exactly one boundary.** REP-103 fixes URDF at metres; ClawBot is
+  millimetres by inheritance. One factor of 1000, one place, per OpenDesignCore ADR-0004's
+  own rule.
+
+**Consequences.** ADR-0005's decision stands and its argument is now *stronger* than when it
+was written — see [`Knowledge/sources/dh-conventions.md`](Knowledge/sources/dh-conventions.md),
+which supplies three arguments against DH that ADR-0005 did not make, including the one that
+matters most here: a DH table cannot carry the tool transform, which ADR-0003 makes
+load-bearing.
+
+What is retracted is the *consequences* sentence. "A mapping rather than a reinterpretation"
+was too strong. The honest form: structure maps both ways, absence maps neither, and each
+direction needs a rule it does not get for free.
+
+The breach against invariant #8 is closed. It cost a day, which is the going rate — PD-1 cost
+four hours. The lesson repeats because the temptation repeats: a claim about a converter is
+cheap to write and expensive to leave unchecked.
+
+---
+
+## ADR-0008 — Trees branch, and a coupled joint is a `mimic`
+
+**Date:** 2026-08-22
+**Status:** accepted (amends ADR-0005's `kind` enum)
+
+**Context.** `robot.schema.json` contradicts itself. The `kind` enum says "Open serial chains
+only. Delta arms, four-bar linkages and differentials are closed chains that the tree in
+ADR-0005 cannot express." The `joints` field says "the graph must be a tree rooted at
+base_link, which a validator checks." **A tree branches; a serial chain does not.** Both
+sentences were written the same day and only one can be enforced.
+
+The contradiction hid a real question. Three mechanism shapes were being lumped together:
+
+1. **A branching tree** — a torso carrying two arms and a head, a pan-tilt with two payloads,
+   a gripper with two independently driven fingers. Still a tree. FK is still a walk.
+2. **A coupled tree** — a parallel-jaw gripper where one actuator drives both jaws, a
+   differential wrist, a linkage where one joint's value is a fixed function of another's.
+   Kinematically constrained, but the *graph* is still a tree.
+3. **A true closed loop** — a delta arm, a four-bar, a Stewart platform. The graph has a cycle,
+   and FK stops being a walk and becomes a constraint solve.
+
+ADR-0005 refused all three by refusing the third. URDF distinguishes 2 from 3 with a single
+element: `mimic`, carrying `joint`, `multiplier` and `offset`
+([`Knowledge/sources/urdf-spec.md`](Knowledge/sources/urdf-spec.md)).
+
+**Decision.** Trees, including branching ones, and coupled joints via `mimic`. Loops stay
+refused.
+
+- The `joints` tree rule is the correct one and it stands. The `kind` enum's "open serial
+  chains only" is **withdrawn** — it described a restriction the schema never enforced.
+- `kind` remains as a *label* for what sort of mechanism this is, not as a topology constraint.
+  The two were conflated and are now separate.
+- A joint may carry `mimic: { joint, multiplier, offset }`, meaning its value is
+  `multiplier * other + offset`. A mimicking joint is **not independently commandable**, and a
+  reachability computation must not sample it as a free axis — which is the whole reason it has
+  to be in the model rather than left as prose.
+- A `mimic` cycle is a validation error. So is a `mimic` pointing at a joint that does not
+  exist, or at a `fixed` joint.
+
+**Consequences.** The cheap 80% of "closed chains" is now expressible and the expensive 20% is
+still refused, which is a better line than refusing both. A parallel gripper — the single most
+common mechanism anyone would try to describe with this schema — was previously inexpressible
+for a reason that turned out to be about loops it does not have.
+
+True loops remain out, and the ROADMAP entry stays. When one arrives it needs its own ADR, and
+it is a representation change rather than a field: `mimic` is a fixed function of one other
+joint, and a delta arm is a simultaneous constraint over several. Conflating them later would
+be worse than refusing them now.
+
+Rejected: adding a `closed_chain` boolean to signal "this record is an approximation of a loop".
+A flag that says the data is wrong is not better than refusing the data.
+
+---
+
+## ADR-0009 — Six joint types, and reach is relative to `base_link`
+
+**Date:** 2026-08-22
+**Status:** accepted (amends ADR-0005's joint enum; extends ADR-0003)
+
+**Context.** ClawBot's joint enum carries four types. URDF's carries six: the four, plus
+`floating` (six degrees of freedom) and `planar` (motion in a plane). The ROADMAP files mobile
+bases under "Not yet", and `base_link` is documented as "assumed fixed to the world".
+
+So "structurally URDF" was already false by omission before anyone asked for a rover. That is
+worth separating from the question of whether rovers are wanted, because it means the enum was
+short for a reason nobody had written down.
+
+The reason mobile bases *looked* hard is a conflation. A moving base seems to break reachability
+— if the robot can drive, what does "can it reach that point" even mean? But that is only true
+if reach is expressed in world coordinates, and **ADR-0003 already refuses to express it that
+way**. Reach is computed from the joint model and the declared tool offset. Every transform in a
+robot record is relative to `base_link`. None of that needs the base to be anywhere in
+particular.
+
+**Decision.** Adopt URDF's full six-type enum, and state explicitly what was previously assumed.
+
+- `floating` and `planar` join the joint type enum.
+- **Every reachability and capacity answer is relative to `base_link`, and says so in the
+  value.** This was already true and undocumented; it is now a declared property, carried the
+  same way ADR-0003 makes the verdict carry its tool offset.
+- ClawBot **does not model where the base is.** A world pose comes from a localization stack,
+  which is Oh-Ben-Claw's competence
+  ([`Knowledge/concepts/ecosystem-position.md`](Knowledge/concepts/ecosystem-position.md)). A
+  ClawBot answer that claimed world coordinates would be asserting a pose it has no source for
+  — invariant #1, in a new costume.
+- A `floating` or `planar` joint has **no meaningful `limits`**, and a validator must not demand
+  them. Its travel is bounded by an environment, not by the mechanism, and ClawBot does not model
+  environments.
+- Gravity direction is **not** derivable for a non-fixed base. A static capacity derivation
+  (ADR-0004) needs to know which way is down; with a floating base that is a function of the
+  base's orientation, which is unknown here. Such a derivation must either take a declared base
+  orientation as an input and report it, or answer "incomplete". It may not assume z-up.
+
+**Consequences.** A mobile manipulator is describable, and the description is honest about what
+it does not know. This is a smaller change than "support robotic vehicles" sounds like, because
+it adds expressiveness without adding a localization story — and the localization story is the
+part ClawBot has no business owning.
+
+The gravity consequence is the sharp one and it will be unpopular: an arm on a rover gets a
+capacity answer only if somebody says which way the rover is tilted. That is correct. The
+alternative is a capacity figure that is silently a flat-ground figure, which is exactly the
+"true at one configuration, wrong everywhere else" failure ADR-0004 removed `payload_kg` to
+prevent, reintroduced through the base instead of the pose.
+
+Wheels, propellers, odometry and gait are **not** in scope. A `planar` base joint says the base
+moves in a plane. It does not say how, and this repo does not model how.
+
+---
+
+## ADR-0010 — ClawBot owns the body contract; the loop stays in Oh-Ben-Claw
+
+**Date:** 2026-08-22
+**Status:** accepted (extends ADR-0001; does not reverse it)
+
+**Context.** ADR-0001 rejected putting a mechanism model inside Oh-Ben-Claw, on the grounds
+that a model living in a runtime is a model no other consumer can read without taking the
+runtime as a dependency. The obvious follow-on question — whether the reverse should happen,
+and ClawBot should grow the control layer — was never asked.
+
+Reading Oh-Ben-Claw settles the factual half. **It has no robot model.** `obc-movement` is two
+files exposing `MovementCommand::ServoAngle { name, channel, angle }` — a flat map from a name
+and a channel number to an angle, with no representation of the fact that channel 3 is
+mechanically downstream of channel 1. `obc-navigation` is a 2D mobile-base localization,
+mapping and planning column. There is no link tree, no joint limit table, no kinematics.
+
+So ADR-0001's second rejection was argued against a repo that had not solved this, and the
+gap is real rather than assumed. That removes the argument for folding ClawBot into
+Oh-Ben-Claw. It does not, by itself, answer how far the other way to go.
+
+The line has to be drawn somewhere, because "control" is not one thing. Four layers were
+considered:
+
+1. **The body model** — links, joints, limits, actuators. Already ClawBot's.
+2. **Derivations over it** — forward kinematics, the reachable set, static capacity. Already
+   promised by ADR-0003 and ADR-0004.
+3. **A control contract** — the bounds and rates a controller must respect, and a verdict on
+   whether this body can do a named thing at all.
+4. **The loop** — inverse kinematics, trajectory generation, servo updates, actuation.
+
+**Decision.** ClawBot owns 1 through 3. Layer 4 stays in Oh-Ben-Claw, behind Track 0.
+
+The dividing line is not "how much control" but **what the answer is derived from**. Layers 1-3
+are functions of cited hardware data and geometry: the same inputs always give the same answer,
+and every answer can name the citation it rests on. Layer 4 is a function of the world right
+now — where the target is, what the sensors say, what the operator approved. Those are
+different kinds of claim, and the platform already separates them everywhere else. It is the
+same split as OpenBuildCore's `can-print`: OBC decides whether the geometry fits the machine;
+AdvancedStudio runs the print.
+
+Concretely, ClawBot adds:
+
+- **Control-relevant bounds as first-class, cited data.** Joint travel, effort and velocity
+  limits already exist in the schema. What is new is that they are declared as *the* source for
+  a controller's limits, so a bound enforced on hardware traces to a datasheet rather than to a
+  config file somebody typed.
+- **An affordance verdict.** Given a robot and a named request, ClawBot answers whether this
+  body can do it, or answers "incomplete" and names the missing input. This is the
+  can-it-actually-happen half of the SayCan pattern, and it is genuinely ClawBot's: the question
+  is a function of the body, not of the world. The difference from a learned affordance model is
+  that this one is *derived and cited*, so it can say why it said no.
+
+And ClawBot still never:
+
+- commands an actuator, or emits anything a device could execute directly;
+- solves inverse kinematics, plans a trajectory, or optimises one;
+- knows where anything in the world is, including itself (ADR-0009).
+
+**Consequences.** Oh-Ben-Claw becomes a consumer of a model it currently lacks, which is what
+ADR-0001 predicted, and the direction of the dependency stays correct — data flows out of
+ClawBot, nothing flows in. The peers meet at data (ADR-0006) and this is one more instance of
+it, not an exception.
+
+**One seam is now visible and must be resolved at the boundary, not in the middle.**
+`MovementCommand::ServoAngle` is in **degrees**; ClawBot mandates radians in the file
+(ADR-0005), and REP-103 puts URDF in radians too. The conversion belongs at exactly one place
+in whatever consumes ClawBot data, the same rule ADR-0007 applies to millimetres. Recorded here
+because a degrees/radians seam between two repos that both believe they are right is the classic
+way a mechanism ends up commanded to 57 times the intended angle.
+
+Rejected: emitting a Track 0 limit table directly, in Oh-Ben-Claw's own config format. It was
+tempting — the limits are right here and cited, and Track 0's are typed by hand. But a
+ClawBot that writes another repo's config file has taken that repo's format as a dependency,
+which is the coupling ADR-0006 exists to prevent. ClawBot publishes the limits as its own data
+and Oh-Ben-Claw reads them. If that proves too much friction, it is Oh-Ben-Claw's importer to
+write, and its ADR to record.
+
+Rejected: a learned policy surface — action-space definitions, simulation export, dataset
+schemas. Not because it is wrong, but because it is a second product rather than a schema
+change, and nothing in the repo is built yet. It goes on the ROADMAP under "Not yet", where a
+real request can pull it forward.
