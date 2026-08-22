@@ -129,6 +129,82 @@ def test_the_crate_manifest_takes_no_dependencies():
         "zero dependencies is the point (OpenPartsCore ADR-0003)"
 
 
+# --------------------------------------------- ADR-0020: the control contract
+
+def test_the_binding_carries_the_field_its_own_argument_rests_on():
+    """ADR-0017 justified the crate on the Radians/Degrees seam and then shipped
+    without harness.channels.zero_offset_rad, the one angular value a runtime
+    reads on its way to a servo. This fails if that regresses."""
+    header = emit_rust.HEADER
+    assert "pub struct Channel" in header
+    assert "zero_offset" in header
+    assert "pub struct Harness" in header
+    assert "HARNESSES" in emit_rust.render()
+
+
+def test_actuator_angle_returns_radians_not_degrees():
+    """Returning Degrees would move the boundary inside the crate and the
+    consumer would stop seeing it (ADR-0020)."""
+    header = emit_rust.HEADER
+    assert "pub fn actuator_angle(&self, joint: Radians) -> Radians" in header
+    assert "-> Degrees" not in header.split("fn actuator_angle")[1][:200]
+
+
+def test_nothing_is_named_like_an_instruction():
+    """ADR-0020 rejects a Channel::command(...) for the same reason ADR-0017
+    rejects a fn is_safe(...): a name that reads as an action invites a caller to
+    treat a data model as an authority."""
+    header = emit_rust.HEADER
+    # Match a definition, not a prefix: the Radians doctest legitimately defines
+    # `fn commands_a_joint`, and a bare "fn command" substring flags it.
+    for forbidden in ("fn command(", "fn actuate(", "fn drive(", "fn move_to(",
+                      "fn send(", "fn execute("):
+        assert forbidden not in header, f"{forbidden} reads as an instruction"
+
+
+def test_unchecked_travel_is_an_option_bool_not_a_bool():
+    """ADR-0012's tri-state. A plain bool would collapse 'nobody checked' into
+    'does not permit' at the type level."""
+    header = emit_rust.HEADER
+    assert "pub permits_full_travel: Option<bool>" in header
+
+
+def test_assemblies_are_deliberately_absent_and_say_so():
+    header = emit_rust.HEADER
+    assert "pub struct Assembly" not in header
+    assert "assemblies are not emitted" in header
+
+
+def test_a_harness_renders_its_channels_and_runs():
+    harness = {
+        "harness_id": "h1", "robot_id": "r1",
+        "controller": {"part_id": "boards/esp32-s3"},
+        "channels": [{"joint_id": "elbow", "channel": 3, "bus": "pwm",
+                      "inverted": True, "zero_offset_rad": 0.1}],
+        "routing": [{"run_id": "loom", "crosses": ["elbow"],
+                     "permits_full_travel": None}],
+        "power": {"supply_volts": 12.0, "shared_with_logic": False},
+    }
+    rendered = emit_rust.render_harness(harness)
+    assert 'joint_id: "elbow"' in rendered
+    assert "channel: Some(ChannelId::Number(3))" in rendered
+    assert "bus: Some(Bus::Pwm)" in rendered
+    assert "inverted: true" in rendered
+    assert "zero_offset: Some(Radians(0.1_f64))" in rendered
+    assert "permits_full_travel: None" in rendered
+    assert "supply_volts: Some(12.0_f64)" in rendered
+
+
+def test_a_string_channel_id_survives_as_a_name():
+    """A CAN node id or a bus name is not an integer, and coercing it would lose
+    what the controller actually calls the output."""
+    harness = {"harness_id": "h", "robot_id": "r",
+               "channels": [{"joint_id": "j", "channel": "AX-12/ID3",
+                             "inverted": False}]}
+    rendered = emit_rust.render_harness(harness)
+    assert 'ChannelId::Name("AX-12/ID3")' in rendered
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_")]
     failed = 0

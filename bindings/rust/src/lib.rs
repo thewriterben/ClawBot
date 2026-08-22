@@ -365,12 +365,156 @@ impl Actuator {
     }
 }
 
+/// How a command physically reaches an actuator. Determines what a controller can
+/// **know** as much as what it can do: a `Pwm` actuator reports nothing back.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Bus {
+    Pwm,
+    I2c,
+    Spi,
+    Uart,
+    Can,
+    Rs485,
+    StepDir,
+}
+
+/// Whatever the controller calls this output — a PWM channel number, a bus id, a
+/// CAN node id. Carried verbatim in whichever form the controller uses.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum ChannelId {
+    Number(i64),
+    Name(&'static str),
+}
+
+/// One driven joint's entry in the control contract (ADR-0010).
+///
+/// This is the type ADR-0017 was written for. The `Radians`/`Degrees` split only
+/// pays for itself at a boundary, and **this is the boundary**: Oh-Ben-Claw's
+/// `MovementCommand::ServoAngle` takes degrees, every value here is radians, and
+/// [`Channel::actuator_angle`] is the one place the two meet.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct Channel {
+    pub joint_id: &'static str,
+    pub channel: Option<ChannelId>,
+    pub bus: Option<Bus>,
+    pub bus_address: Option<ChannelId>,
+    /// True when a positive command produces motion in the negative direction of
+    /// the joint's declared axis. A fact about how the thing was physically
+    /// installed, and **the most common reason a correct model drives a mechanism
+    /// into its own end stop**.
+    pub inverted: bool,
+    /// The actuator's zero expressed in joint coordinates. Corke names this as a
+    /// distinct ambiguity a DH table cannot carry: a mechanism's zero-angle pose
+    /// and its controller's zero-angle pose are routinely different.
+    pub zero_offset: Option<Radians>,
+}
+
+impl Channel {
+    /// Convert a joint value into the angle this actuator should be commanded to,
+    /// applying inversion and zero offset.
+    ///
+    /// Returns [`Radians`], deliberately. A consumer whose wire format is degrees
+    /// converts at its own boundary and the conversion is visible in one line:
+    ///
+    /// ```
+    /// use clawbot::{Channel, Radians, Degrees};
+    /// let ch = Channel {
+    ///     joint_id: "elbow", channel: None, bus: None, bus_address: None,
+    ///     inverted: true, zero_offset: Some(Radians(0.1)),
+    /// };
+    /// let command: Degrees = ch.actuator_angle(Radians(0.5)).into();
+    /// assert!((command.0 - (-0.4_f64).to_degrees()).abs() < 1e-12);
+    /// ```
+    ///
+    /// It lives here rather than in each consumer so that every consumer applies
+    /// the same arithmetic. Publishing the contract is not commanding: nothing in
+    /// this crate reaches hardware (ADR-0010).
+    pub fn actuator_angle(&self, joint: Radians) -> Radians {
+        let sign = if self.inverted { -1.0 } else { 1.0 };
+        Radians(sign * joint.0 + self.zero_offset.map_or(0.0, |o| o.0))
+    }
+}
+
+/// A cable, and the joints it crosses. **A cable that crosses a joint is a joint
+/// limit** (ADR-0012): unless somebody left slack, it binds before the joint does.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct CableRun {
+    pub id: &'static str,
+    pub crosses: &'static [&'static str],
+    /// **`None` means NOBODY CHECKED** — never that it is fine. `Option<bool>` is
+    /// load-bearing here: the compiler will not let a caller collapse the unknown
+    /// case into the false case without writing it down.
+    pub permits_full_travel: Option<bool>,
+    /// Where the harness binds tighter than the joint. Only ever a limit somebody
+    /// established, with a method.
+    pub travel_limit: &'static [HarnessTravelLimit],
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct HarnessTravelLimit {
+    pub joint_id: &'static str,
+    pub lower: Option<Radians>,
+    pub upper: Option<Radians>,
+    pub how_determined: &'static str,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct Power {
+    /// Load-bearing: a torque figure is meaningless without its voltage, and a
+    /// capacity derivation selects the actuator row matching THIS value
+    /// (ADR-0014). `None` means no derivation is possible.
+    pub supply_volts: Option<f64>,
+    pub supply_current_a: Option<f64>,
+    /// If true, an actuator stall can brown out the controller — turning a
+    /// mechanical problem into a loss of control.
+    pub shared_with_logic: Option<bool>,
+}
+
+/// What connects the actuators to the thing that drives them, and to power.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct Harness {
+    pub id: &'static str,
+    pub robot_id: &'static str,
+    pub controller_part_id: Option<&'static str>,
+    pub channels: &'static [Channel],
+    pub routing: &'static [CableRun],
+    pub power: Power,
+}
+
+impl Harness {
+    pub fn channel_for(&self, joint_id: &str) -> Option<&'static Channel> {
+        self.channels.iter().find(|c| c.joint_id == joint_id)
+    }
+
+    /// Cable runs that cross a joint where nobody established what travel they
+    /// permit. While this is non-empty, any reachability answer over this
+    /// mechanism **over-claims**, and must say so (ADR-0012).
+    pub fn unchecked_runs(&self) -> impl Iterator<Item = &'static CableRun> + '_ {
+        self.routing.iter().filter(|r| {
+            !r.crosses.is_empty()
+                && r.permits_full_travel.is_none()
+                && r.travel_limit.is_empty()
+        })
+    }
+}
+
+// NOTE: assemblies are not emitted. An assembly is a DAG of steps for a person at
+// a bench — fasteners, torques, what cannot be undone — and no runtime consumes
+// it. Adding it here would be data nothing reads, which ADR-0017's whole argument
+// is against. It stays in `data/assemblies/` as JSON.
+
 pub fn robot(id: &str) -> Option<&'static Robot> {
     ROBOTS.iter().find(|r| r.id == id)
 }
 
 pub fn actuator(id: &str) -> Option<&'static Actuator> {
     ACTUATORS.iter().find(|a| a.id == id)
+}
+
+/// The harness wiring a given robot, if one has been recorded. `None` means the
+/// cable routing is unknown, which is not the same as "there are no cables".
+pub fn harness_for(robot_id: &str) -> Option<&'static Harness> {
+    HARNESSES.iter().find(|h| h.robot_id == robot_id)
 }
 
 /// Every robot record, sorted by id.
@@ -398,4 +542,11 @@ pub const ACTUATORS: &[Actuator] = &[
         basis: None,
         spread_pct: None,
     },
+];
+
+/// Every harness record, sorted by id. This is the control contract
+/// ADR-0010 promised: joint to physical output, plus the two facts no
+/// amount of modelling recovers — which way it was installed, and where
+/// its zero is.
+pub const HARNESSES: &[Harness] = &[
 ];

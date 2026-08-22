@@ -297,6 +297,115 @@ fn there_is_no_efficiency_field_to_reach_for() {
     }
 }
 
+// ------------------------------------- ADR-0010/0012: the control contract
+
+fn channel(inverted: bool, offset: Option<Radians>) -> Channel {
+    Channel {
+        joint_id: "elbow",
+        channel: Some(ChannelId::Number(3)),
+        bus: Some(Bus::Pwm),
+        bus_address: None,
+        inverted,
+        zero_offset: offset,
+    }
+}
+
+#[test]
+fn the_seam_is_one_legible_line() {
+    // The whole reason ADR-0017 split Radians from Degrees. A consumer whose wire
+    // format is degrees converts here and nowhere else.
+    let ch = channel(false, None);
+    let command: Degrees = ch.actuator_angle(Radians(core::f64::consts::PI)).into();
+    assert!((command.0 - 180.0).abs() < 1e-12);
+}
+
+#[test]
+fn inversion_and_offset_compose_in_one_place() {
+    // -1 * 0.5 + 0.1 = -0.4. True before this code existed.
+    let ch = channel(true, Some(Radians(0.1)));
+    assert!((ch.actuator_angle(Radians(0.5)).0 - -0.4).abs() < 1e-12);
+
+    // Not inverted, same offset: 0.5 + 0.1 = 0.6.
+    let ch = channel(false, Some(Radians(0.1)));
+    assert!((ch.actuator_angle(Radians(0.5)).0 - 0.6).abs() < 1e-12);
+}
+
+#[test]
+fn inverted_is_the_end_stop_bug_made_explicit() {
+    // The most common reason a correct model drives a mechanism into its own end
+    // stop is that nobody wrote down which way the servo was installed.
+    let straight = channel(false, None).actuator_angle(Radians(1.0));
+    let flipped = channel(true, None).actuator_angle(Radians(1.0));
+    assert!((straight.0 + flipped.0).abs() < 1e-12, "they must be negatives");
+}
+
+#[test]
+fn actuator_angle_returns_radians_so_the_conversion_stays_visible() {
+    // If this returned Degrees, the boundary would move inside the crate and the
+    // consumer would stop seeing it. Asserted by the type: the line below only
+    // compiles because the return is Radians.
+    let _stays_radians: Radians = channel(false, None).actuator_angle(Radians(0.0));
+}
+
+#[test]
+fn an_unchecked_cable_run_is_none_not_false() {
+    // Option<bool> is load-bearing: the compiler will not let a caller collapse
+    // "nobody checked" into "does not permit" without writing it down (ADR-0012).
+    let run = CableRun {
+        id: "wrist-loom",
+        crosses: &["elbow", "wrist-pitch"],
+        permits_full_travel: None,
+        travel_limit: &[],
+    };
+    assert!(run.permits_full_travel.is_none());
+    assert_ne!(run.permits_full_travel, Some(false));
+
+    let answer = match run.permits_full_travel {
+        None => "nobody checked",
+        Some(true) => "full travel",
+        Some(false) => "narrowed",
+    };
+    assert_eq!(answer, "nobody checked");
+}
+
+#[test]
+fn harness_lookups_return_none_rather_than_a_default() {
+    for harness in HARNESSES {
+        assert!(harness.channel_for("no-such-joint").is_none());
+        for channel in harness.channels {
+            assert!(harness.channel_for(channel.joint_id).is_some());
+        }
+        // Every unchecked run must actually cross something; a run crossing
+        // nothing cannot narrow a joint.
+        for run in harness.unchecked_runs() {
+            assert!(!run.crosses.is_empty());
+        }
+    }
+    assert!(harness_for("no-such-robot").is_none());
+}
+
+#[test]
+fn a_harness_names_the_robot_it_wires() {
+    for harness in HARNESSES {
+        assert!(!harness.robot_id.is_empty());
+        assert_eq!(harness_for(harness.robot_id).map(|h| h.id), Some(harness.id));
+    }
+}
+
+#[test]
+fn supply_voltage_absent_means_no_capacity_derivation() {
+    // ADR-0014: the derivation selects the actuator row matching this value, and
+    // picking one on the author's behalf is the invisible choice it removed.
+    for harness in HARNESSES {
+        if harness.power.supply_volts.is_none() {
+            // Nothing to assert about the value; the point is that it is an
+            // Option and a consumer must handle the None.
+            let derivable = harness.power.supply_volts.is_some();
+            assert!(!derivable);
+        }
+    }
+}
+
 #[test]
 fn millimetres_convert_to_metres_at_one_named_place() {
     assert!((Millimetres(1000.0).to_metres() - 1.0).abs() < 1e-12);

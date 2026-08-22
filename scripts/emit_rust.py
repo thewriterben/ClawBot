@@ -428,12 +428,156 @@ impl Actuator {
     }
 }
 
+/// How a command physically reaches an actuator. Determines what a controller can
+/// **know** as much as what it can do: a `Pwm` actuator reports nothing back.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Bus {
+    Pwm,
+    I2c,
+    Spi,
+    Uart,
+    Can,
+    Rs485,
+    StepDir,
+}
+
+/// Whatever the controller calls this output — a PWM channel number, a bus id, a
+/// CAN node id. Carried verbatim in whichever form the controller uses.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum ChannelId {
+    Number(i64),
+    Name(&'static str),
+}
+
+/// One driven joint's entry in the control contract (ADR-0010).
+///
+/// This is the type ADR-0017 was written for. The `Radians`/`Degrees` split only
+/// pays for itself at a boundary, and **this is the boundary**: Oh-Ben-Claw's
+/// `MovementCommand::ServoAngle` takes degrees, every value here is radians, and
+/// [`Channel::actuator_angle`] is the one place the two meet.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct Channel {
+    pub joint_id: &'static str,
+    pub channel: Option<ChannelId>,
+    pub bus: Option<Bus>,
+    pub bus_address: Option<ChannelId>,
+    /// True when a positive command produces motion in the negative direction of
+    /// the joint's declared axis. A fact about how the thing was physically
+    /// installed, and **the most common reason a correct model drives a mechanism
+    /// into its own end stop**.
+    pub inverted: bool,
+    /// The actuator's zero expressed in joint coordinates. Corke names this as a
+    /// distinct ambiguity a DH table cannot carry: a mechanism's zero-angle pose
+    /// and its controller's zero-angle pose are routinely different.
+    pub zero_offset: Option<Radians>,
+}
+
+impl Channel {
+    /// Convert a joint value into the angle this actuator should be commanded to,
+    /// applying inversion and zero offset.
+    ///
+    /// Returns [`Radians`], deliberately. A consumer whose wire format is degrees
+    /// converts at its own boundary and the conversion is visible in one line:
+    ///
+    /// ```
+    /// use clawbot::{Channel, Radians, Degrees};
+    /// let ch = Channel {
+    ///     joint_id: "elbow", channel: None, bus: None, bus_address: None,
+    ///     inverted: true, zero_offset: Some(Radians(0.1)),
+    /// };
+    /// let command: Degrees = ch.actuator_angle(Radians(0.5)).into();
+    /// assert!((command.0 - (-0.4_f64).to_degrees()).abs() < 1e-12);
+    /// ```
+    ///
+    /// It lives here rather than in each consumer so that every consumer applies
+    /// the same arithmetic. Publishing the contract is not commanding: nothing in
+    /// this crate reaches hardware (ADR-0010).
+    pub fn actuator_angle(&self, joint: Radians) -> Radians {
+        let sign = if self.inverted { -1.0 } else { 1.0 };
+        Radians(sign * joint.0 + self.zero_offset.map_or(0.0, |o| o.0))
+    }
+}
+
+/// A cable, and the joints it crosses. **A cable that crosses a joint is a joint
+/// limit** (ADR-0012): unless somebody left slack, it binds before the joint does.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct CableRun {
+    pub id: &'static str,
+    pub crosses: &'static [&'static str],
+    /// **`None` means NOBODY CHECKED** — never that it is fine. `Option<bool>` is
+    /// load-bearing here: the compiler will not let a caller collapse the unknown
+    /// case into the false case without writing it down.
+    pub permits_full_travel: Option<bool>,
+    /// Where the harness binds tighter than the joint. Only ever a limit somebody
+    /// established, with a method.
+    pub travel_limit: &'static [HarnessTravelLimit],
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct HarnessTravelLimit {
+    pub joint_id: &'static str,
+    pub lower: Option<Radians>,
+    pub upper: Option<Radians>,
+    pub how_determined: &'static str,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct Power {
+    /// Load-bearing: a torque figure is meaningless without its voltage, and a
+    /// capacity derivation selects the actuator row matching THIS value
+    /// (ADR-0014). `None` means no derivation is possible.
+    pub supply_volts: Option<f64>,
+    pub supply_current_a: Option<f64>,
+    /// If true, an actuator stall can brown out the controller — turning a
+    /// mechanical problem into a loss of control.
+    pub shared_with_logic: Option<bool>,
+}
+
+/// What connects the actuators to the thing that drives them, and to power.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct Harness {
+    pub id: &'static str,
+    pub robot_id: &'static str,
+    pub controller_part_id: Option<&'static str>,
+    pub channels: &'static [Channel],
+    pub routing: &'static [CableRun],
+    pub power: Power,
+}
+
+impl Harness {
+    pub fn channel_for(&self, joint_id: &str) -> Option<&'static Channel> {
+        self.channels.iter().find(|c| c.joint_id == joint_id)
+    }
+
+    /// Cable runs that cross a joint where nobody established what travel they
+    /// permit. While this is non-empty, any reachability answer over this
+    /// mechanism **over-claims**, and must say so (ADR-0012).
+    pub fn unchecked_runs(&self) -> impl Iterator<Item = &'static CableRun> + '_ {
+        self.routing.iter().filter(|r| {
+            !r.crosses.is_empty()
+                && r.permits_full_travel.is_none()
+                && r.travel_limit.is_empty()
+        })
+    }
+}
+
+// NOTE: assemblies are not emitted. An assembly is a DAG of steps for a person at
+// a bench — fasteners, torques, what cannot be undone — and no runtime consumes
+// it. Adding it here would be data nothing reads, which ADR-0017's whole argument
+// is against. It stays in `data/assemblies/` as JSON.
+
 pub fn robot(id: &str) -> Option<&'static Robot> {
     ROBOTS.iter().find(|r| r.id == id)
 }
 
 pub fn actuator(id: &str) -> Option<&'static Actuator> {
     ACTUATORS.iter().find(|a| a.id == id)
+}
+
+/// The harness wiring a given robot, if one has been recorded. `None` means the
+/// cable routing is unknown, which is not the same as "there are no cables".
+pub fn harness_for(robot_id: &str) -> Option<&'static Harness> {
+    HARNESSES.iter().find(|h| h.robot_id == robot_id)
 }
 
 '''
@@ -569,9 +713,89 @@ def render_actuator(act: dict) -> str:
     )
 
 
+BUS_RS = {"pwm": "Pwm", "i2c": "I2c", "spi": "Spi", "uart": "Uart",
+          "can": "Can", "rs485": "Rs485", "step-dir": "StepDir"}
+
+
+def channel_id_rs(value) -> str:
+    if value is None:
+        return "None"
+    if isinstance(value, bool):
+        return "None"
+    if isinstance(value, int):
+        return f"Some(ChannelId::Number({value}))"
+    return f"Some(ChannelId::Name({rs_str(str(value))}))"
+
+
+def rad_rs(value) -> str:
+    return "None" if value is None else f"Some(Radians({float(value)!r}_f64))"
+
+
+def render_channel(ch: dict) -> str:
+    bus = ch.get("bus")
+    return (
+        "        Channel {\n"
+        f"            joint_id: {rs_str(ch.get('joint_id', ''))},\n"
+        f"            channel: {channel_id_rs(ch.get('channel'))},\n"
+        f"            bus: " + ("None" if bus is None else f"Some(Bus::{BUS_RS[bus]})")
+        + ",\n"
+        f"            bus_address: {channel_id_rs(ch.get('bus_address'))},\n"
+        f"            inverted: {'true' if ch.get('inverted') else 'false'},\n"
+        f"            zero_offset: {rad_rs(ch.get('zero_offset_rad'))},\n"
+        "        },\n"
+    )
+
+
+def render_run(run: dict) -> str:
+    crosses = ", ".join(rs_str(j) for j in run.get("crosses") or [])
+    limits = "".join(
+        "                HarnessTravelLimit { "
+        f"joint_id: {rs_str(t.get('joint_id', ''))}, "
+        f"lower: {rad_rs(t.get('lower_rad'))}, "
+        f"upper: {rad_rs(t.get('upper_rad'))}, "
+        f"how_determined: {rs_str(t.get('how_determined', ''))} }},\n"
+        for t in run.get("travel_limit") or [])
+    permits = run.get("permits_full_travel")
+    return (
+        "        CableRun {\n"
+        f"            id: {rs_str(run.get('run_id', ''))},\n"
+        f"            crosses: &[{crosses}],\n"
+        f"            permits_full_travel: "
+        + ("None" if permits is None else f"Some({'true' if permits else 'false'})")
+        + ",\n"
+        f"            travel_limit: &[\n{limits}            ],\n"
+        "        },\n"
+    )
+
+
+def render_harness(h: dict) -> str:
+    channels = "".join(render_channel(c) for c in h.get("channels") or [])
+    routing = "".join(render_run(r) for r in h.get("routing") or [])
+    power = h.get("power") or {}
+    shared = power.get("shared_with_logic")
+    controller = (h.get("controller") or {}).get("part_id")
+    return (
+        "    Harness {\n"
+        f"        id: {rs_str(h['harness_id'])},\n"
+        f"        robot_id: {rs_str(h.get('robot_id', ''))},\n"
+        f"        controller_part_id: {rs(controller)},\n"
+        f"        channels: &[\n{channels}        ],\n"
+        f"        routing: &[\n{routing}        ],\n"
+        "        power: Power {\n"
+        f"            supply_volts: {rs_f64(power.get('supply_volts'))},\n"
+        f"            supply_current_a: {rs_f64(power.get('supply_current_a'))},\n"
+        f"            shared_with_logic: "
+        + ("None" if shared is None else f"Some({'true' if shared else 'false'})")
+        + ",\n"
+        "        },\n"
+        "    },\n"
+    )
+
+
 def render() -> str:
     robots = load("robots", "robot_id")
     actuators = load("actuators", "actuator_id")
+    harnesses = load("harnesses", "harness_id")
     body = HEADER
     body += "/// Every robot record, sorted by id.\n"
     body += "pub const ROBOTS: &[Robot] = &[\n"
@@ -580,6 +804,13 @@ def render() -> str:
     body += "/// Every actuator record, sorted by id.\n"
     body += "pub const ACTUATORS: &[Actuator] = &[\n"
     body += "".join(render_actuator(a) for a in actuators)
+    body += "];\n\n"
+    body += "/// Every harness record, sorted by id. This is the control contract\n"
+    body += "/// ADR-0010 promised: joint to physical output, plus the two facts no\n"
+    body += "/// amount of modelling recovers — which way it was installed, and where\n"
+    body += "/// its zero is.\n"
+    body += "pub const HARNESSES: &[Harness] = &[\n"
+    body += "".join(render_harness(h) for h in harnesses)
     body += "];\n"
     return body
 
@@ -600,9 +831,11 @@ def main() -> int:
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(text, encoding="utf-8")
-    robots, actuators = load("robots", "robot_id"), load("actuators", "actuator_id")
+    counts = (len(load("robots", "robot_id")),
+              len(load("actuators", "actuator_id")),
+              len(load("harnesses", "harness_id")))
     print(f"wrote {OUT.relative_to(ROOT)} "
-          f"({len(robots)} robot(s), {len(actuators)} actuator(s))")
+          f"({counts[0]} robot(s), {counts[1]} actuator(s), {counts[2]} harness(es))")
     return 0
 
 

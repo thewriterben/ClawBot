@@ -63,9 +63,9 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 
 ## Status
 
-Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), nineteen ADRs, six stdlib
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty ADRs, six stdlib
 scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`, `emit_rust`), an MCP
-surface and a zero-dependency Rust binding. 140 Python tests, 24 Rust tests. `data/` holds one
+surface and a zero-dependency Rust binding. 147 Python tests, 33 Rust tests. `data/` holds one
 real actuator record; no robot record yet, and that one needs hardware in hand.
 
 Do not write a README claim the code does not support. Equally: do not leave a status claim

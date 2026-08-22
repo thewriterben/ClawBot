@@ -1095,3 +1095,65 @@ Rejected: refusing to *describe* a mechanism in a refused category. ClawBot is a
 notation that cannot express a thing does not prevent the thing; it prevents the thing being
 described accurately, which is worse, and it would put this repo in the business of deciding
 what may be written down.
+
+---
+
+## ADR-0020 — The binding carries the control contract, and the contract's own arithmetic
+
+**Date:** 2026-08-22
+**Status:** accepted (completes ADR-0017; scopes what the binding emits)
+
+**Context.** ADR-0017 justified the Rust binding almost entirely on one seam: `Radians` and
+`Degrees` are distinct types, so passing degrees where radians are required does not compile, and
+Oh-Ben-Claw's `MovementCommand::ServoAngle` is in degrees.
+
+The binding shipped without the field that seam actually lives on. It emitted `Robot` and
+`Actuator` and **no `Harness`** — so `harness.channels.zero_offset_rad`, the one angular value a
+runtime would read on its way to commanding a servo, was not in the crate at all. The binding
+could not be used for the thing that justified it. That is a gap in execution rather than a
+change of mind, and it is worth recording because the ADR read as complete while the artifact
+was not.
+
+Two decisions came out of closing it.
+
+**Decision 1 — the contract's arithmetic lives in the crate.**
+
+`Channel::actuator_angle(Radians) -> Radians` applies `inverted` and `zero_offset` and returns
+radians.
+
+That looks, at a glance, like ClawBot computing a command, which ADR-0010 forbids. It is not, and
+the distinction is worth stating: **inversion and zero offset are part of the contract, not part
+of the decision to move.** They are facts about how the hardware was physically installed, they
+are fixed for the life of the build, and applying them is arithmetic that every consumer would
+otherwise write identically — which means every consumer would eventually write one of them
+differently. Nothing here reaches hardware, chooses a target, or decides when to act.
+
+It **returns `Radians` deliberately.** Returning `Degrees` would move the boundary inside the
+crate and the consumer would stop seeing it, which is the opposite of ADR-0017's whole argument.
+The consumer converts at its own edge, and the seam stays one legible line:
+`Degrees::from(channel.actuator_angle(target))`.
+
+**Decision 2 — assemblies are not emitted, and that is deliberate.**
+
+An assembly is a DAG of steps for a person at a bench: fasteners, torques, what cannot be undone.
+No runtime consumes it. Emitting it would be data nothing reads, which is precisely what
+ADR-0017's zero-dependency, nothing-you-do-not-need argument is against. It stays in
+`data/assemblies/` as JSON, where a build-guide renderer can read it.
+
+If something ever consumes assemblies programmatically, this is the decision to revisit — and the
+question to ask first is whether that consumer wants Rust or wants the JSON it is already
+sitting next to.
+
+**Consequences.** `Option<bool>` on `CableRun::permits_full_travel` is now doing real work: the
+compiler will not let a caller collapse *nobody checked* into *does not permit* without writing
+the match arm. That is ADR-0012's tri-state, enforced rather than documented, and it is the
+second-best thing in the crate after the `compile_fail` doctests.
+
+The crate's surface grows by five types and two lookups, all of them const data with no
+dependencies. `HARNESSES` is empty today because `data/harnesses/` is, so the harness tests
+exercise the type API rather than real records — which is honest and stated in the tests rather
+than papered over with a fixture pretending to be data.
+
+Rejected: a `Channel::command(...)` or anything else named like an instruction. ADR-0017 already
+refused predicates that look like safety authorities; the same reasoning applies to names that
+look like actions. `actuator_angle` describes what it returns, not what to do with it.
