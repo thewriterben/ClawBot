@@ -30,6 +30,12 @@ These are decided. If a change would introduce one, it needs a superseding ADR, 
 | A fastener torque defaulting to "hand tight" | Absent means UNKNOWN; a stripped insert in a printed part is unrecoverable | ADR-0011 |
 | Reading `permits_full_travel: null` as true | Null means nobody checked, and an unchecked cable run makes reach over-claim | ADR-0012 |
 | Inventing a `size_mm` for a `provenance_ref` link | ClawBot holds the hash and not the bounding box; OBC's `can-print --from-sidecar` judges the real geometry | ADR-0006 |
+| A torque figure as a scalar wearing a voltage | Torque against voltage is a curve; the XM430 spans 26% across its own rated range | ADR-0014 |
+| Interpolating between published torque rows | "Approximately linear" is an unsourced model whose output is indistinguishable from a datasheet value | ADR-0014 |
+| An affordance score in [0,1] | A float is a frequency estimate and no trials were run — and SayCan consumers *multiply* it, so it would vanish into a product | ADR-0015 |
+| A `can` verdict | Sampled reach is sound positive, static capacity sound negative; no combination yields a provable yes | ADR-0015 |
+| An MCP tool taking a filesystem path | That is an arbitrary file read wearing a domain-specific name | ADR-0016 |
+| An MCP tool that repairs what `validate` finds | A write to `data/` is a person's judgement about physical hardware | ADR-0016 |
 
 ## Units
 
@@ -50,9 +56,10 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 
 ## Status
 
-Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), fourteen ADRs, four
-stdlib scripts (`validate`, `kinematics`, `manifest`, `urdf`), 84 passing tests. `data/` holds
-one real actuator record; no robot record yet, and that one needs hardware in hand.
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), sixteen ADRs, five stdlib
+scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`) and an MCP surface,
+110 passing tests. `data/` holds one real actuator record; no robot record yet, and that one
+needs hardware in hand.
 
 Do not write a README claim the code does not support. Equally: do not leave a status claim
 standing after the code has moved past it — this section said "no code" for exactly as long as

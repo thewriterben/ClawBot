@@ -297,3 +297,65 @@ licence), payload to ADR-0003, and the DH argument to ADR-0004 — each off by o
 with a duplicated line in ROADMAP's "Not yet". Worth noting the shape: a citation pointing at
 the wrong thing is exactly the failure this repo is built to prevent, and it was sitting in the
 file that explains the discipline.
+
+---
+
+## [2026-08-22] build | Composing the two derivations proves there is no yes to give
+
+The affordance verdict ADR-0010 promised, and an MCP surface. The interesting result came out
+of the composition rather than out of either half.
+
+**The two derivations are unsound in opposite directions.** Neither ADR-0004 nor ADR-0013 said
+this, because it is only visible when they meet.
+
+Sampled reach is **sound positive, unsound negative**: a point only enters the reachable set
+after forward kinematics put the tool there, so "reachable" is proven and "no sample found it"
+is merely unproven. Static capacity is the mirror — **sound negative, unsound positive**: the
+derived figure is an upper bound, so exceeding it is conclusive, and coming in under it proves
+nothing, because efficiency, friction, backlash and acceleration are all unmodelled and all
+subtract.
+
+Compose them and the four combinations contain no provable success. So ADR-0015's verdict set is
+`cannot` (the only assertable negative, and it is a real claim), `within-static-bound` (the
+closest thing to yes, deliberately not named `can` because a bound that overstates cannot
+guarantee anything), `unproven`, and `incomplete`. There is a test called
+`test_there_is_no_can_verdict_anywhere` whose entire job is to fail if somebody later adds one.
+
+**The score was the other refusal.** The literature's affordance is a float in [0,1], and that
+float is a frequency estimate — it comes from trials. This repo has run none. What made it worth
+an explicit refusal rather than an omission is that SayCan-style consumers **multiply**
+affordances: a fabricated 0.7 does not sit in a report where somebody might question it, it goes
+into a product and disappears. The honest thing to rank on is the **margin** — real headroom in
+newton metres, derived and cited. A margin has units; a score does not.
+
+**Rejected, and worth recording:** reporting the *best* margin across all reaching poses as the
+answer. Tempting, and wrong in a specific way — the best-margin pose is the one holding the load
+closest to the joint axes, which is frequently useless for the actual task. It is offered as a
+separate field beside the verdict's own pose, so a caller sees both without one masquerading as
+the other. Also rejected: squashing the margin into [0,1], which would be a fabricated number
+wearing arithmetic, with the squashing function silently setting a risk posture nobody declared.
+
+**The MCP surface, and the thing it made visible.** ClawBot was the last peer without one.
+Adopting [[opendesigncore]] ADR-0009's execute-versus-propose line produced an empty propose
+side — **not unused, empty**. This repo has no side effects by construction: ADR-0010 put every
+actuating loop behind Track 0, ADR-0006 keeps it from importing a peer, and `data/` is edited by
+people. Nothing can be added to that side without first reversing an ADR. Worth writing down,
+because "no propose tools" reads like an oversight and is actually the load-bearing consequence
+of two earlier decisions.
+
+**The one real risk ran the other way, and it is not a robotics risk at all.** `urdf.py import`
+takes a path and reads it. Exposed as an MCP tool that is an **arbitrary file read** wearing a
+domain-specific name — in a repo whose threat surface is otherwise "might return a number that
+is wrong". It stays on the CLI, where the person running it chose the file, and there is a test
+that fails if any tool ever grows a path-like parameter. A text-taking variant would be a
+different thing and is the right shape if the need is real.
+
+**And the failure mode an MCP surface invites most.** Every tool returns its whole verdict
+object rather than a bare boolean or a bare distance, because a tool result is usually
+summarised by a model before a human reads it, and a stripped caveat is exactly what a summary
+drops. `list_actuators` surfaces `capacity_derivable` for the same reason: on the one real
+record in `data/`, it is `false`, and that is the single most consequential fact about that
+actuator.
+
+Sample counts are clamped at 200,000 **and the clamp is reported**. Silently honouring a
+pathological N is a denial of service; silently refusing it is a lie about what was computed.

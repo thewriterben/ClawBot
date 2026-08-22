@@ -49,7 +49,7 @@ volume is a boundary claim in disguise.
 
 ## Counts
 
-4 concepts, 5 entities, 9 source summaries. One real record in `data/`, cited to a vendor manual. 1 raw source copied locally; the rest cited by
+4 concepts, 5 entities, 9 source summaries, 5 log entries. One real record in `data/`, cited to a vendor manual. 1 raw source copied locally; the rest cited by
 repo-relative path or by URL with a retrieval date.
 
 Evidence quality is not uniform and the pages say so individually. The URDF pages rest on a

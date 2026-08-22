@@ -666,3 +666,148 @@ data is a hypothesis.
 Rejected: keeping a scalar and adding a separate `torque_curve` array beside it. It would leave
 two places for the same fact and a question about which one wins — the registry-drift shape the
 platform exists to end, in miniature, inside one record.
+
+---
+
+## ADR-0015 — The affordance answer is a verdict and a margin, never a score — and it can never be an unqualified yes
+
+**Date:** 2026-08-22
+**Status:** accepted (delivers the affordance verdict ADR-0010 promised)
+
+**Context.** ADR-0010 said ClawBot would answer whether a given body can do a named thing — the
+*can-it-actually-happen* half of the SayCan pattern, where a language model's "does this skill
+serve the instruction" is multiplied by an affordance model's "can this robot do it now". The
+literature's affordance is a **float in [0.0, 1.0]**.
+
+Building it out of `reach` and `hold` surfaced two problems, and the second one is the
+interesting one.
+
+### A score would be a fabricated number
+
+A learned affordance model's float is a frequency estimate: it comes from trials, and 0.7 means
+something close to "succeeded in 70% of attempts". ClawBot has run no trials. It has cited
+hardware facts and two derivations over them. Any float it emitted would be a number with the
+*shape* of a probability and no frequency behind it — the exact failure this repo deletes fields
+to prevent, and worse than most because SayCan-style consumers **multiply** it. A fabricated
+0.7 does not sit in a report where someone might question it; it propagates into a product and
+disappears.
+
+There is a real need underneath the request, though: a planner comparing options needs to rank
+them. The honest thing to rank on is the **margin** — the actual physical headroom, in newton
+metres or millimetres, derived and cited. A margin is a real quantity with units. A score is a
+fabricated one without.
+
+### The two derivations are unsound in opposite directions, so a yes is not available
+
+This is the part that was not obvious until the two were composed.
+
+**Sampled reach is sound positive, unsound negative** (ADR-0013). A point only enters the
+reachable set after forward kinematics put the tool there, so "reachable" is proven and "no
+sample reached it" is merely unproven.
+
+**Static capacity is sound negative, unsound positive** (ADR-0004). The derived figure is an
+*upper bound* — efficiency, friction, backlash and acceleration are not modelled, so real
+capacity is lower. If the load exceeds the upper bound, it exceeds the real capacity too: that
+negative is **conclusive**. But a load *under* the upper bound proves nothing, because the bound
+overstates.
+
+Compose them and the four combinations do not include a provable success:
+
+| reach | capacity | what is actually known |
+|---|---|---|
+| sample found a pose | load exceeds the bound | **cannot** — conclusive, because exceeding an upper bound settles it |
+| sample found a pose | load under the bound | reachable, and **not refuted** on capacity. Not a yes. |
+| no sample reached it | — | **unproven**. Not a no (ADR-0013) |
+| either | a missing input | **incomplete**, naming it |
+
+**Decision.** Four verdicts, no score, and a margin that carries its own units.
+
+- **`cannot`** — the only negative this repo will assert, and it is available only through
+  capacity. It requires a pose that actually reached the target, so the claim is "at the pose we
+  found, the static upper bound is exceeded", not "this is impossible everywhere". A different
+  pose reaching the same point may do better, and the verdict says so.
+- **`within-static-bound`** — the closest thing to yes. Reach found a pose; capacity is not
+  exceeded there. Named this way on purpose: `can` would be read as a guarantee, and a bound that
+  overstates cannot guarantee anything.
+- **`unproven`** — no sample reached the target in N samples. Never `cannot`.
+- **`incomplete`** — a named missing input, propagated from whichever derivation raised it.
+
+Every verdict carries the **binding constraint** — which joint, or reach itself — and the
+**margin** in the units of that constraint. Rank on the margin.
+
+**Consequences.** ClawBot will never tell a caller that a robot *can* do something, and that is
+going to read as unhelpful the first few times. It is the correct amount of confidence: the two
+things it knows are a sampled lower bound on reach and an optimistic upper bound on capacity,
+and neither supports a guarantee. A system that said "yes" here would be claiming that
+efficiency, friction and self-collision do not matter — three things this repo explicitly does
+not model and says so in every answer.
+
+The **`cannot`** is worth more than it looks. A conclusive negative that names the joint and the
+overage is directly actionable: it says which actuator to change and by how much. Most systems
+in this space give a confident yes and a vague no; this one does the opposite, which is the more
+useful half if only one is going to be honest.
+
+Rejected: emitting a score derived from the margin — normalising headroom into [0,1] with some
+squashing function. It would be a fabricated number wearing arithmetic, and the choice of
+squashing function would silently set a risk posture nobody declared.
+
+Rejected: taking the *best* pose across all reaching samples and reporting its margin as the
+answer. Tempting, and wrong in a specific way: the best-margin pose is the one where the load
+sits closest to the joint axes, which is frequently a pose that is useless for the task. The
+verdict reports the pose it reached with and offers the best-margin pose alongside as a
+*separate* field, so a caller can see both without one masquerading as the other.
+
+---
+
+## ADR-0016 — The MCP surface is entirely execute, and deliberately cannot read a file you name
+
+**Date:** 2026-08-22
+**Status:** accepted (adopts OpenDesignCore ADR-0009's line; the propose side comes out empty)
+
+**Context.** ClawBot was the last of the five peers without an MCP surface. OpenDesignCore
+ADR-0009 set the platform's rule: reads and deterministic runs **execute**, anything reaching a
+fabricator **proposes**, and no approval tool exists on the server side. OpenBuildCore adopted
+it and observed that all of its tools land on the execute side because nothing in it writes.
+
+ClawBot is the stronger case of the same thing. **It has no side effects at all**, by
+construction rather than by accident: ADR-0010 put every actuating loop behind Oh-Ben-Claw's
+Track 0, ADR-0006 keeps it from importing a peer, and it writes to no store — `data/` is edited
+by people, and every script returns a value rather than changing one. So the propose side of
+ADR-0009 is not merely unused here, it is **empty**, and there is nothing a future tool could be
+added to it without first breaking a different ADR.
+
+That is worth writing down, because "no propose tools" reads like an oversight and is actually
+the load-bearing consequence of two earlier decisions.
+
+**The one real risk is the opposite of the usual one.** `urdf.py import` takes a path and reads
+it. Exposed as an MCP tool, that is not a robotics feature — it is an **arbitrary file read**
+handed to whatever is driving the client, wearing a domain-specific name. The interesting part
+is that it looks harmless in a repo whose entire threat surface is otherwise "returns a number
+that might be wrong".
+
+**Decision.**
+
+- Every tool is a **read or a deterministic derivation**, and all of them execute. No propose
+  path, no approval tool, and none may be added without an ADR that first reverses ADR-0010.
+- **No tool accepts a filesystem path.** `import_urdf` is deliberately absent from the surface;
+  it stays a CLI command, where the person running it already chose the file. A tool that takes
+  URDF **text** may be added later — that is a different thing, because the caller supplies the
+  bytes rather than naming a file the server can reach.
+- **Sample counts are capped** at a stated ceiling, and a request above it is clamped **with the
+  clamp reported in the result**. A sampled reach with a large enough N is a denial of service
+  against the process, and silently honouring it is as bad as silently refusing it.
+- Every tool returns the **full verdict object**, caveats included. A tool that returned a bare
+  boolean or a bare distance would strip the assumptions that ADR-0003, ADR-0004, ADR-0013 and
+  ADR-0015 each require to travel *inside* the value. This is the failure mode an MCP surface
+  invites most, because tool results get summarised by a model before a human sees them.
+
+**Consequences.** An agent can ask what a mechanism can do and gets back an answer it cannot
+strip the caveats from without doing so deliberately. That is the point: the whole repo is an
+argument that the caveats are the answer.
+
+The absent import tool will be asked for. The reply is that it exists on the CLI, and that a
+text-taking variant is the right shape if the need is real.
+
+Rejected: a `validate` tool that fixes what it finds. Validation is a read; repair is a write,
+and a write to `data/` is a person's judgement about physical hardware. An agent quietly filling
+in a joint limit is the precise failure this repo was built to prevent.

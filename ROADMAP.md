@@ -27,9 +27,9 @@
 - [x] Close the actuator/parts boundary question against real records — OpenPartsCore's `electronic/sg90` carries identity, bus and capabilities and **no torque, speed or mass**. The split holds with zero overlap (2026-08-22)
 - [ ] A first **robot** record. Still needs a real mechanism with real datasheets — a described-from-memory arm would be exactly the invented data the schema exists to refuse. This is the one thing on this list that hardware, not effort, unblocks.
 - [ ] A Rust binding, following OpenPartsCore's codegen discipline, so Oh-Ben-Claw can read the body model without taking Python.
-- [ ] The affordance verdict ADR-0010 promised — a named request in, "this body can/cannot/incomplete" out. `reach` and `hold` are its two halves; nothing composes them yet.
+- [x] **The affordance verdict ADR-0010 promised** — and composing `reach` with `hold` surfaced something neither showed alone: sampled reach is sound *positive*, static capacity is sound *negative*, and no combination of the two yields a provable yes. Four verdicts, no score, rank on margin (ADR-0015) (2026-08-22)
 - [ ] Resolve the degrees/radians seam with Oh-Ben-Claw. `ServoAngle` is degrees; this repo and REP-103 are radians. ADR-0010 puts the conversion at one boundary and nothing enforces it yet.
-- [ ] An MCP surface. ClawBot is the only peer without one; reads and derivations execute, nothing reaches an actuator (ODC ADR-0009's line).
+- [x] **An MCP surface** — ClawBot is no longer the peer without one. ADR-0009's propose side comes out **empty** here, not unused: this repo has no side effects by construction. No tool takes a filesystem path, sample counts are clamped with the clamp reported, and every tool returns its whole verdict because a tool result gets summarised by a model before a human sees it (ADR-0016) (2026-08-22)
 - [ ] A position on PD-5 legality gating. Project BINGO's `REFUSAL-CATEGORIES.md` names design-time assistants as bound by the taxonomy, and `weapons.other` and `regulated.medical` land directly on a mechanism repo.
 
 ## Not yet

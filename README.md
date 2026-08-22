@@ -2,18 +2,20 @@
 
 Describe a robot once — links, joints, actuators, and where every number came from. Then ask what it can actually reach, and what it can actually hold there.
 
-**Status:** pre-alpha. Four schemas, fourteen ADRs, four scripts, **84 passing tests**, and a knowledge base whose robotics half is no longer empty. `data/` holds one real record — a Dynamixel XM430-W350, written from the vendor's own manual, whose continuous torque is `null` because ROBOTIS names the stall/continuous distinction and then publishes only stall. No robot record yet: that needs a real mechanism in hand, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
+**Status:** pre-alpha. Four schemas, sixteen ADRs, five scripts, an MCP surface, **110 passing tests**, and a knowledge base whose robotics half is no longer empty. `data/` holds one real record — a Dynamixel XM430-W350, written from the vendor's own manual, whose continuous torque is `null` because ROBOTIS names the stall/continuous distinction and then publishes only stall. No robot record yet: that needs a real mechanism in hand, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
 
 ```
 python scripts/validate.py                     # uncited claims, degrees in _rad, non-trees
 python scripts/kinematics.py reach <id>        # sampled workspace, with every assumption
 python scripts/kinematics.py hold <id> --pose  # static capacity, labelled an upper bound
 python scripts/manifest.py <id> --as-project   # the bill of parts, in OBC's vocabulary
+python scripts/affordance.py <id> --target X,Y,Z --payload-g N   # can this body do it?
 python scripts/urdf.py import <file.urdf>      # reads the XML, not the parsed tree
-python -m pytest tests/ -q                     # 84 tests
+python -m clawbot_mcp.server                   # the same answers over MCP
+python -m pytest tests/ -q                     # 110 tests
 ```
 
-The tests are the interesting part. 31 are negative — every rule with teeth, proven to bite. 26 are known answers rather than pinned outputs: a 1 kg mass on a 100 mm arm loads the joint with 0.980665 N⋅m whether or not this code has ever run. 19 run the URDF round trip that [ADR-0007](DECISIONS.md) makes claims about. And two validate emitted output against **OpenBuildCore's own schema file**, not a copy of it — skipping honestly if that repo is not checked out beside this one.
+The tests are the interesting part. 31 are negative — every rule with teeth, proven to bite. 26 are known answers rather than pinned outputs: a 1 kg mass on a 100 mm arm loads the joint with 0.980665 N⋅m whether or not this code has ever run. 19 run the URDF round trip that [ADR-0007](DECISIONS.md) makes claims about, including one asserting that provenance *does not* survive it. 16 guard the affordance composition, one of them named `test_there_is_no_can_verdict_anywhere`. 10 guard the MCP surface against the two ways it would quietly go wrong — a tool that takes a file path, and a tool that strips its caveats. And two validate emitted output against **OpenBuildCore's own schema file**, not a copy of it — skipping honestly if that repo is not checked out beside this one.
 
 ## Where it sits
 
@@ -82,6 +84,8 @@ Both are the same discipline OpenBuildCore applied to print time: *if nobody mea
 A third rule joined them once the computation existed. **A sampled workspace only ever proves the positive** (ADR-0013). "Reachable" is a claim, and carries the pose that got there. "Not reachable" is never returned — the verdict says `no-sample-reached-it` and names how many samples were drawn, because a sampled set is inner-bounded and its silence is not evidence.
 
 And a fourth, from the wiring: **a cable that crosses a joint is a joint limit** (ADR-0012). `permits_full_travel: null` means nobody checked, never that it is fine, and a reachability answer over an unchecked harness says so in the value.
+
+The fifth only appeared when the first two were composed. **ClawBot cannot tell you a robot *can* do something** (ADR-0015). Sampled reach is sound positive and unsound negative; static capacity is sound *negative* and unsound positive. Put them together and there is no combination that yields a provable yes — so `affordance.py` answers `cannot` (a real claim: an upper bound was exceeded, and real capacity is lower still), `within-static-bound` (the closest thing to yes, and not a guarantee), `unproven`, or `incomplete`. There is deliberately no affordance score: a float in [0,1] is a frequency estimate, no trials were run, and SayCan-style consumers *multiply* affordances — so a fabricated one would propagate into a product and vanish. Rank on the margin, which has units.
 
 ## Knowledge base
 
