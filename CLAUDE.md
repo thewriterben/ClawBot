@@ -17,9 +17,19 @@ These are decided. If a change would introduce one, it needs a superseding ADR, 
 | A `reach_mm` field | A vendor reach figure is a radius to an unstated frame, before a tool, over a sphere the arm cannot fill | ADR-0003 |
 | A scalar `payload_kg` | Capacity is a function of pose; one number is true at one configuration | ADR-0004 |
 | Stall torque in a capacity derivation | It is an instantaneous figure the actuator cannot sustain | ADR-0004 |
-| DH parameters as the stored form | Two incompatible conventions; the table does not record which | ADR-0005 |
+| DH parameters as the stored form | Two incompatible conventions; the table does not record which — and it cannot carry the tool transform or branch | ADR-0005, ADR-0007 |
 | Degrees in a data file | `_rad` in the file, degrees only in rendered output | ADR-0005 |
 | Importing a peer repo | The peers meet at data that already had to exist | ADR-0006 |
+| Exporting URDF with a zero for an unknown limit | The format cannot say "unknown"; export refuses and names the joint instead | ADR-0007 |
+| Importing URDF through the parsed tree | The parse is where absence is destroyed — missing bounds become `0`, a missing axis becomes `(1,0,0)` | ADR-0007 |
+| A world-coordinate reach or capacity answer | Every answer is relative to `base_link`; a world pose has no source here | ADR-0009 |
+| Assuming z-up for a non-fixed base | Gravity direction is unknown, so a static capacity answers incomplete rather than assuming level ground | ADR-0009 |
+| Commanding an actuator, or solving IK | ClawBot publishes the contract; the loop stays behind Oh-Ben-Claw's Track 0 | ADR-0010 |
+| Writing another repo's config format | That takes its format as a dependency, which is the coupling ADR-0006 prevents | ADR-0010 |
+| A modelled build time, or summed per-step estimates | Summing guesses produces a total more precise than any of its inputs | ADR-0011 |
+| A fastener torque defaulting to "hand tight" | Absent means UNKNOWN; a stripped insert in a printed part is unrecoverable | ADR-0011 |
+| Reading `permits_full_travel: null` as true | Null means nobody checked, and an unchecked cable run makes reach over-claim | ADR-0012 |
+| Inventing a `size_mm` for a `provenance_ref` link | ClawBot holds the hash and not the bounding box; OBC's `can-print --from-sidecar` judges the real geometry | ADR-0006 |
 
 ## Units
 
@@ -40,4 +50,25 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 
 ## Status
 
-Scaffold. Schemas and decisions, no code. Do not write a README claim the code does not support.
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), thirteen ADRs, four
+stdlib scripts (`validate`, `kinematics`, `manifest`, `urdf`), 79 passing tests. `data/` is
+empty on purpose.
+
+Do not write a README claim the code does not support. Equally: do not leave a status claim
+standing after the code has moved past it — this section said "no code" for exactly as long as
+that was true.
+
+## Verify with
+
+```
+python scripts/validate.py
+python -m pytest tests/ -q
+```
+
+Tests are **known answers, not pinned outputs** — OpenDesignCore's distinction. A pinned-output
+test says the code still does what it did; a known-answer test says it does the right thing.
+When a test fails, check the arithmetic before changing the expectation.
+
+Stdlib only for `scripts/`, matching OpenPartsCore and OpenBuildCore. `tests/` may use
+`jsonschema` to check output against a **peer's own schema file**, and must *skip* rather than
+pass when that peer is not checked out — a skipped test is an honest "not checked".

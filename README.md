@@ -2,7 +2,18 @@
 
 Describe a robot once — links, joints, actuators, and where every number came from. Then ask what it can actually reach, and what it can actually hold there.
 
-**Status:** scaffold. Schemas, decisions and a knowledge base; **no code yet**. What is written down here is the contract an implementation will have to satisfy, and the reasoning it is not allowed to quietly discard.
+**Status:** pre-alpha. Four schemas, thirteen ADRs, four scripts, **79 passing tests**, and a knowledge base whose robotics half is no longer empty. `data/` is still empty on purpose — a first robot record needs a real mechanism with real datasheets, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
+
+```
+python scripts/validate.py                     # uncited claims, degrees in _rad, non-trees
+python scripts/kinematics.py reach <id>        # sampled workspace, with every assumption
+python scripts/kinematics.py hold <id> --pose  # static capacity, labelled an upper bound
+python scripts/manifest.py <id> --as-project   # the bill of parts, in OBC's vocabulary
+python scripts/urdf.py import <file.urdf>      # reads the XML, not the parsed tree
+python -m pytest tests/ -q                     # 79 tests
+```
+
+The tests are the interesting part. 29 are negative — every rule with teeth, proven to bite. 23 are known answers rather than pinned outputs: a 1 kg mass on a 100 mm arm loads the joint with 0.980665 N⋅m whether or not this code has ever run. 19 run the URDF round trip that [ADR-0007](DECISIONS.md) makes claims about. And two validate emitted output against **OpenBuildCore's own schema file**, not a copy of it — skipping honestly if that repo is not checked out beside this one.
 
 ## Where it sits
 
@@ -36,12 +47,27 @@ A robot is a tree of **links** connected by **joints**, driven by **actuators**.
 robot
 ├── links[]       a rigid body. Either a part_id from OpenPartsCore,
 │                 or a `make` — something you fabricate, carrying size and material
-│                 exactly as OpenBuildCore's third requirement kind does.
+│                 exactly as OpenBuildCore's third requirement kind does,
+│                 or a provenance_ref — an OpenDesignCore artifact hash.
 ├── joints[]      parent link, child link, type, origin transform, axis,
-│                 and limits: travel, effort, velocity — each with a source
+│                 and limits: travel, effort, velocity — each with a source.
+│                 A `mimic` makes one joint follow another, so a parallel gripper
+│                 is expressible without a loop in the graph (ADR-0008).
 └── actuators[]   what drives a joint. Torque and speed come from a datasheet
                   with a citation, or they are absent.
+
+assembly         a DAG of steps — what joins what, which fasteners at what torque,
+                 which steps cannot be undone. No modelled build time (ADR-0011).
+
+harness          which actuator is on which channel, and which cables cross which
+                 joints — because a cable that crosses a joint is a joint limit,
+                 and an unchecked one makes reach over-claim (ADR-0012).
 ```
+
+The graph is a **tree**, and trees branch: a torso with two arms and a head is one robot
+record. All six URDF joint types are available, including `floating` and `planar`, so a
+mechanism on a moving base is describable — and every derived answer is explicitly relative to
+`base_link`, because ClawBot has no source for where that is in the world (ADR-0009).
 
 Every record needs a `source.citation`, the same gate the reference registry uses. A joint limit is a physical claim about hardware.
 
@@ -52,6 +78,10 @@ Every record needs a `source.citation`, the same gate the reference registry use
 **Payload is a function of pose** (ADR-0003). A payload figure is accepted only as a `measured_payload` that names the pose it was measured at and how. Otherwise capacity is derived from actuator effort limits and geometry, and reported per-pose. Absence of a payload answer is the honest default.
 
 Both are the same discipline OpenBuildCore applied to print time: *if nobody measured it, and it cannot be derived from something that was, the answer is "I cannot tell you"* — which is less useful than a number and more useful than a wrong one.
+
+A third rule joined them once the computation existed. **A sampled workspace only ever proves the positive** (ADR-0013). "Reachable" is a claim, and carries the pose that got there. "Not reachable" is never returned — the verdict says `no-sample-reached-it` and names how many samples were drawn, because a sampled set is inner-bounded and its silence is not evidence.
+
+And a fourth, from the wiring: **a cable that crosses a joint is a joint limit** (ADR-0012). `permits_full_travel: null` means nobody checked, never that it is fine, and a reachability answer over an unchecked harness says so in the value.
 
 ## Knowledge base
 

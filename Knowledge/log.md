@@ -157,3 +157,77 @@ bounding box to declare, and emitting a `make` requirement for it would put a fa
 `size_mm` inside a document that validates. Those links are reported separately and handed to
 OBC's `can-print --from-sidecar`, which judges the real geometry (ODC ADR-0010) and is the
 stronger check anyway.
+
+---
+
+## [2026-08-22] build | The computations exist, and the converter ADR-0007 described was actually run
+
+Two more sources, one ADR, three scripts, 79 tests. The repo went from "schemas and decisions"
+to "answers a question and refuses to answer several others on the record".
+
+**Sourcing finished, except the one that would license a number.** Lynch and Park for forward
+kinematics; the Monte Carlo workspace and FCL/ACM collision literature for the two remaining
+computation topics. Seven of eight topics answered. The last — gearbox efficiency and backlash —
+is last on purpose: every other topic licensed a *decision*, which can rest on a survey, and this
+one would multiply a derived capacity and turn ADR-0004's upper bound into an estimate. That
+needs vendor data with a method.
+
+**A third representation nobody had considered, and it changes nothing.** [[forward-kinematics]]
+teaches FK by **product of exponentials** and puts DH in an appendix. ADR-0005 framed its choice
+as DH versus a URDF tree; PoE was never on the table. It does not reopen the decision, and the
+reason is the good part: PoE is a *computation*, not a storage format, and a screw axis is
+derivable from what the tree already stores. Better still, the two frames PoE requires are
+exactly the two this repo already insists on naming — a fixed base frame (ADR-0009) and an
+end-effector frame (ADR-0003's tool offset). DH loses both as factorisation residue. Recorded as
+open-question 6 and closed in the same breath, because "we did not consider X" is worth writing
+down even when X would not have changed anything.
+
+**Two topics closed by refusing them, which counts as read.** Self-collision needs link geometry
+this repo deliberately does not carry (ADR-0006 keeps geometry in [[opendesigncore]]) plus an
+allowed-collision matrix nobody has authored. The bounding-box shortcut was considered and
+rejected: it would flag adjacent links constantly, and its silence would be indistinguishable
+from real clearance. **A collision check that cannot tell "clear" from "not checked" is worse
+than none, because the first is a claim.** Same shape of answer for workspace volume — a single
+figure computed from an inner-bounded sample understates by an unknown amount and would be read
+as measured.
+
+**ADR-0013: sampled reachability, and the asymmetry that makes it honest.** A sampled workspace
+is inner-bounded — every point it reports was actually reached by FK, so its errors are all
+false negatives. That is the direction this repo is allowed to be wrong in, and the opposite of
+ADR-0003's known over-claim on self-collision. So "reachable" is a claim carrying the pose that
+got there, and **"not reachable" is never returned** — the verdict is `no-sample-reached-it` with
+the sample count in it. Sampling is seeded and the seed is recorded, because unrecorded
+randomness would break [[opendesigncore]]'s determinism discipline.
+
+**Two real bugs found while writing the capacity derivation**, both caught by writing the test
+before trusting the code. Every joint was being loaded by every mass regardless of whether it
+hung below that joint; and the lever arm was an xy-distance approximation instead of torque about
+the actual joint axis. Fixed to `n . (r x F)` with the axis rotated from the child frame into the
+base frame, and the masses filtered by descendant set. The known-answer test that caught it —
+1 kg at 100 mm is 0.980665 N.m — was true before the code existed, which is the whole argument
+for known answers over pinned outputs.
+
+**A third bug, and a nice one.** `element.find("parent") or ET.Element("p")` looks harmless and
+is always wrong: an ElementTree element with no children is *falsy*, so a present `<parent>` fell
+through to the empty fallback every time. There is now a test named after it.
+
+**ADR-0007's claims are no longer claims.** The converter it described exists and 19 tests run
+the round trip. Everything it asserted holds: structure survives both ways; a `<limit>` with no
+bounds imports as UNKNOWN rather than the zero `urdfdom` would produce; a missing `<axis>` is
+recorded as a *format default* in the citation rather than as the author's statement; and a robot
+with unsourced limits **cannot be exported at all**, with every offending joint named rather than
+the first. Two things turned up that ADR-0007 did not anticipate: `effort` and `velocity` are
+*also* fatal to `urdfdom`, so export refuses on those too; and URDF names routinely contain
+underscores while ClawBot ids may not, so every rename is reported rather than done quietly.
+
+**And the loss that is the whole reason URDF is not the storage format**, now with a test named
+after it: `test_provenance_does_not_survive_the_round_trip`. A joint limit cited to a vendor
+datasheet exports, re-imports, and comes back cited to "URDF import". The format has nowhere to
+record where a number came from. That was ADR-0005's opening premise and it is now demonstrated
+rather than asserted.
+
+**Documentation caught up twice, and that is a rule now.** The README said "no code yet" for
+exactly as long as that was true, and `Knowledge/CLAUDE.md` said the robotics half was empty for
+exactly one day. Both were corrected in the same change as the work that falsified them. The
+"empty half" section was rewritten rather than deleted, because the rule that emptied the
+directory still governs every page written into it.

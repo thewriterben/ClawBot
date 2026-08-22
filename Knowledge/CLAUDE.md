@@ -43,13 +43,18 @@ Knowledge/
 - Mark an unsourced claim `TODO(source)` inline. It is better to record that something is believed and unsourced than to leave it out and have it reappear as an assumption later.
 - Keep pages short and dense. A page that restates a source at length is a failed page; link and summarise.
 
-## The empty half
+## The empty half — filled 2026-08-22, and the rule that emptied it still applies
 
-**`raw/robotics/` is empty, and so is every domain page that would depend on it.** This is a deliberate state, not an unfinished one.
+**This section used to say `raw/robotics/` was empty and that every domain page depending on it was unwritten.** That was true for one day. Six sources were ingested on 2026-08-22 and seven of the eight sourcing topics are answered; only gearbox efficiency and backlash remains. The history is kept here rather than deleted, because the *reason* the directory was empty is the part that has to survive:
 
-An assistant asked about forward kinematics or servo thermal limits will produce fluent, mostly-correct, entirely uncited prose. Filing that into a wiki whose whole purpose is provenance would poison it at the root — and worse, it would look exactly like a page that had been researched. The pages get written when sources arrive.
+An assistant asked about forward kinematics or servo thermal limits will produce fluent, mostly-correct, entirely uncited prose. Filing that into a wiki whose whole purpose is provenance would poison it at the root — and worse, it would look exactly like a page that had been researched. **The pages get written when sources arrive, and not before.** That rule did not stop applying when the first sources turned up; it is what every future page is still held to.
 
-What exists instead is a reading list, in [[open-questions]]. Treat filling it as the highest-value ingest work available.
+Two things learned in the filling, both worth keeping:
+
+- **Evidence quality is not uniform, and a page must say where it sits.** [[urdf-spec]] rests on a schema and a parser read directly. [[forward-kinematics]] rests on a table of contents and secondary reports of an appendix. [[workspace-and-collision]] rests on abstracts. All three are enough to justify a *decision*; only the first would be enough to justify a *value*. Each page states its own standing rather than leaving a reader to assume they are equivalent.
+- **A closed topic is sometimes a refusal.** Self-collision was answered by establishing that this repo cannot do it and naming what it would need. That counts as read, not as pending.
+
+What remains is a reading list, in [[open-questions]]. Treat filling it as the highest-value ingest work available.
 
 ## Operations
 

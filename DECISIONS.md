@@ -513,3 +513,82 @@ contract and never commands. `harness.channels` is that contract — joint to ph
 plus `inverted` and `zero_offset_rad`. Both of those are facts about how the thing was
 physically built that no amount of modelling recovers, and `inverted` is the most common reason
 a correct model drives a mechanism into its own end stop.
+
+---
+
+## ADR-0013 — Reachability is sampled, and "not reachable" is not a claim
+
+**Date:** 2026-08-22
+**Status:** accepted (implements ADR-0003; the ROADMAP flagged this as needing its own ADR)
+
+**Context.** ADR-0003 says reach is computed from the joint model rather than declared, and
+left open *how*. The literature splits the question three ways — analytic, graphic, numerical —
+with the numerical family covering grid, Monte Carlo and interval analysis
+([`Knowledge/sources/workspace-and-collision.md`](Knowledge/sources/workspace-and-collision.md)).
+
+Analytic workspace boundaries exist for specific mechanism families and are reported as having
+"great complexity and poor visibility". They also do not generalise: a new mechanism means new
+mathematics, which is a poor fit for a repo whose whole point is describing mechanisms nobody
+anticipated. Interval analysis is rigorous and is a research programme, not a script.
+
+That leaves sampling, and sampling has a property the surveys do not lead with but which
+decides this for ClawBot.
+
+**A sampled workspace is inner-bounded.** Every point it reports is genuinely reachable,
+because a point only enters the set after forward kinematics put the tool there. Its errors are
+all false *negatives* — points the mechanism can reach that no sample happened to hit.
+
+This is the direction this repo is allowed to be wrong in. ADR-0003 already records that
+computed reach **over**-claims by ignoring self-collision, and names that as the opposite of the
+conservative error OpenBuildCore accepted for axis-aligned fit. Sampling errs the other way. It
+does not cancel the self-collision problem — they are different points — but it does mean the
+method is not adding to it.
+
+**Decision.** Reachability is answered by sampling the joint space, and the two directions of
+the answer are not symmetric.
+
+- **"Reachable" is a claim.** A sample reached it. It carries the pose that got there.
+- **"Not reachable" is never a claim.** The honest phrasing is *"no sample reached it in N
+  samples"*, and N travels in the value. A caller that wants a stronger negative needs a
+  different method, and this repo does not have one.
+- **Sampling is deterministic.** A declared integer seed, recorded in the verdict, so the same
+  robot and the same seed give the same answer. This is OpenDesignCore's determinism discipline
+  (its ADR-0003) applied to a stochastic method: randomness is fine, *unrecorded* randomness is
+  not.
+- **Joint limit extremes are always sampled**, in addition to the random draw. The interesting
+  parts of a workspace are at the limits, and a uniform sample reaches a corner of an n-joint
+  space with probability approaching zero.
+- **A joint with unknown limits stops the computation.** The verdict is "incomplete", naming the
+  joint, per ADR-0003. It is not sampled over an assumed range.
+- **A `mimic` joint is not a free axis.** It is evaluated from the joint it follows (ADR-0008).
+  Sampling it independently would report poses the mechanism cannot hold.
+
+**Every verdict carries its assumptions in the value**, not in documentation — inherited
+invariant #4. That is five things, and all five are load-bearing:
+
+| Carried | Because |
+|---|---|
+| the tool offset assumed | ADR-0003: the answer is meaningless without it |
+| the base frame | ADR-0009: it is never a world claim |
+| sample count and seed | the negative answer means nothing without N; the seed makes it reproducible |
+| "joint-limit result, not a collision result" | self-collision is not modelled and the reach over-claims |
+| whether the harness was checked | ADR-0012: an unchecked cable run is a second over-claim |
+
+**Consequences.** Reachability answers get verbose, and the verbosity is the product. A bare
+"yes" from this system would be indistinguishable from a vendor's reach figure, which is the
+thing ADR-0003 exists to refuse.
+
+Cost accepted: sampling scales badly in the number of joints. Coverage of an n-dimensional
+joint space by N samples thins as n grows, so the same N that is generous for a pan-tilt is
+sparse for a six-axis arm. The mitigation is that N is in the answer, so a thin result announces
+itself rather than looking like a thorough one.
+
+Rejected: reporting a workspace **volume**. It is the number everyone wants and it is a
+boundary claim in disguise — a volume computed from an inner-bounded sample understates by an
+unknown amount, and printed as a single figure it will be read as measured. If it is ever added
+it must carry N and be labelled a lower bound.
+
+Rejected: bounding-box broad-phase self-collision using `make` link sizes. It would flag
+adjacent links constantly — they share a joint — and its silence would be indistinguishable
+from real clearance. A collision check that cannot tell "clear" from "not checked" is worse than
+none, because the first is a claim.
