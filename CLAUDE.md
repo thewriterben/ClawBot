@@ -56,10 +56,10 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 
 ## Status
 
-Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), sixteen ADRs, five stdlib
-scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`) and an MCP surface,
-110 passing tests. `data/` holds one real actuator record; no robot record yet, and that one
-needs hardware in hand.
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), seventeen ADRs, six stdlib
+scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`, `emit_rust`), an MCP
+surface and a zero-dependency Rust binding. 122 Python tests, 21 Rust tests. `data/` holds one
+real actuator record; no robot record yet, and that one needs hardware in hand.
 
 Do not write a README claim the code does not support. Equally: do not leave a status claim
 standing after the code has moved past it — this section said "no code" for exactly as long as
@@ -69,8 +69,13 @@ that was true.
 
 ```
 python scripts/validate.py
+python scripts/emit_rust.py --check
 python -m pytest tests/ -q
+cd bindings/rust && cargo test
 ```
+
+`bindings/rust/src/lib.rs` is **generated and committed**. Never edit it — the types live in
+`scripts/emit_rust.py`, and a hand edit works right up until the next regeneration reverts it.
 
 Tests are **known answers, not pinned outputs** — OpenDesignCore's distinction. A pinned-output
 test says the code still does what it did; a known-answer test says it does the right thing.

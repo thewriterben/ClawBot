@@ -811,3 +811,75 @@ text-taking variant is the right shape if the need is real.
 Rejected: a `validate` tool that fixes what it finds. Validation is a read; repair is a write,
 and a write to `data/` is a person's judgement about physical hardware. An agent quietly filling
 in a joint limit is the precise failure this repo was built to prevent.
+
+---
+
+## ADR-0017 — The Rust binding encodes the refusals in the type system
+
+**Date:** 2026-08-22
+**Status:** accepted (adopts OpenPartsCore ADR-0003's codegen discipline)
+
+**Context.** ADR-0010 made Oh-Ben-Claw a consumer of a body model it does not have, and left
+open how it reads one. OpenPartsCore settled the general mechanism: hand-rolled emitters, stdlib
+only, generated output **committed**, and a `--check` gate that regenerates and diffs so a data
+change without a regenerated binding fails rather than drifting. Its Rust crate takes **zero
+dependencies**, on the grounds that a consumer should not need serde to read static reference
+data.
+
+Copying that gets a working binding. It also misses the opportunity, which is this: **every
+refusal in this repo is currently a convention.** `stall_torque_nm` must not reach a capacity
+derivation — enforced by a validator, a docstring and an ADR, all of which are advice. Absent
+limits mean unknown — enforced the same way. Radians in the file while Oh-Ben-Claw's
+`ServoAngle` is degrees — named in ADR-0010 as a seam and enforced by nothing at all.
+
+A type system enforces at compile time what a docstring enforces by hope. The JSON cannot carry
+that; the binding can.
+
+**Decision.** The binding is const data with zero dependencies, per OpenPartsCore, **and its
+types make the repo's central refusals unrepresentable rather than merely discouraged.**
+
+- **`Radians` and `Degrees` are distinct newtypes**, and conversion between them is explicit and
+  the only path. Oh-Ben-Claw's `ServoAngle` is degrees; a value crossing that boundary must be
+  converted at the boundary or it does not compile. ADR-0010 said "the conversion belongs at
+  exactly one place"; this is the mechanism that makes that true instead of aspirational. The
+  failure it prevents is a mechanism commanded to 57 times the intended angle.
+- **`StallTorque` and `ContinuousTorque` are distinct types with no conversion between them.**
+  Not a shared struct with a flag, not a newtype pair with a `From` impl — there is deliberately
+  **no way to turn one into the other**, because ADR-0004's central rule is that stall torque may
+  never feed a capacity derivation. A consumer that wants to try must write the fraction itself,
+  in its own code, where it is visible in review.
+- **Unknown stays `Option`.** Absent joint limits are `Option<JointLimits>`, not a struct with
+  sentinel zeros. Rust forces the caller to confront the `None`, which is inherited invariant #3
+  — absence of evidence is recorded as absence — moved from a convention to a thing the compiler
+  will not let you skip.
+- **Torque lookup by voltage returns `Option` and there is no interpolating variant** (ADR-0014).
+  A caller asking for 13.0 V on an actuator published at 12.0 and 14.8 gets `None`.
+- **No `Default`, and no convenience accessor that unwraps.** A `limits_or_default()` would undo
+  the whole point in one function.
+
+**Consequences.** The binding is more annoying to use than a plain struct dump, and that is the
+feature. Every place a consumer is forced to write `match` or an explicit conversion is a place
+the platform's discipline used to depend on someone having read an ADR.
+
+Zero dependencies is kept: the newtypes are `#[repr(transparent)]` wrappers over `f64` and cost
+nothing at runtime.
+
+The generated file is committed and `--check` gates it, byte-identical or red, exactly as
+OpenPartsCore does — with one difference worth noting. OpenPartsCore's binding is *only* data,
+so regenerating it is mechanical. This one is data **plus hand-written types**, so the emitter
+carries the type definitions as a literal header and the data as generated tail. If the types
+need to change, they change in the emitter, not in the output. Editing `lib.rs` directly is the
+one thing that silently works and then gets reverted by the next regeneration.
+
+**A note on what is NOT emitted.** No Track 0 limit table in Oh-Ben-Claw's config format. ADR-0010
+rejected that and it stays rejected: writing another repo's format takes that format as a
+dependency. This crate publishes ClawBot's own types, and the importer is Oh-Ben-Claw's to write
+and Oh-Ben-Claw's ADR to record.
+
+Rejected: `serde` derives behind a feature flag. It would be genuinely convenient and it starts
+the dependency conversation that OpenPartsCore's zero-dep decision exists to end. If a consumer
+needs serialisation, the JSON is right there and is the canonical form anyway.
+
+Rejected: emitting a `pub fn is_safe(...)` or any predicate that answers a safety question.
+Nothing in this crate may look like a safety authority. Track 0 is the safety authority, this is
+a data model, and a function named like a permission is how those two get confused.

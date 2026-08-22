@@ -359,3 +359,60 @@ actuator.
 
 Sample counts are clamped at 200,000 **and the clamp is reported**. Silently honouring a
 pathological N is a denial of service; silently refusing it is a lie about what was computed.
+
+---
+
+## [2026-08-22] build | The refusals stop being conventions
+
+A Rust binding, following [[openpartscore]]'s codegen discipline. Copying that pattern gets a
+working crate; the reason this one was worth building is what it does *beyond* the pattern.
+
+**Every refusal in this repo was a convention.** Stall torque must not reach a capacity
+derivation — enforced by a validator, a docstring and an ADR, all of which are advice you have
+to have read. Absent limits mean unknown — same. Radians here while Oh-Ben-Claw's `ServoAngle`
+is degrees — named in ADR-0010 as a seam and enforced by **nothing at all**.
+
+A type system enforces at compile time what a docstring enforces by hope. The JSON cannot carry
+that. The binding can, and ADR-0017 makes it:
+
+- **`Radians` and `Degrees` are distinct newtypes.** Passing degrees where radians are required
+  does not compile. This is the mechanism that makes ADR-0010's "conversion at exactly one
+  place" true rather than aspirational, and the failure it prevents is a mechanism commanded to
+  57 times the intended angle.
+- **`StallTorque` and `ContinuousTorque` are distinct with no conversion between them.** Not a
+  shared struct with a flag, not a `From` impl, not a feature flag — there is deliberately no
+  way to turn one into the other. A consumer who wants the 30-50% rule of thumb must write that
+  arithmetic in their own code, where a reviewer sees it.
+- **Unknown stays `Option`, with no `limits_or_default()`.** One convenience accessor would undo
+  inherited invariant #3 in a single function.
+
+**The best part is that three of those guarantees are testable.** They are compile-time
+properties, which normally means they can only be asserted in a comment — and a comment is
+exactly what gets deleted by the next person who wants the conversion. Rust's `compile_fail`
+doctests execute them: `cargo test` now runs code that *must not compile* and fails if it does.
+So "you cannot convert stall torque to continuous torque" is a test result rather than a claim.
+
+That felt like the whole point of the exercise in miniature. This repo's argument has always
+been that a refusal only counts if something enforces it, and every previous enforcement here
+has been a validator that a person could choose not to run.
+
+**On the emitter's shape, which differs from OpenPartsCore's.** Theirs is only data, so
+regeneration is mechanical. This one is data **plus hand-written types**, carried in the emitter
+as a literal header. That creates a trap worth naming: editing `bindings/rust/src/lib.rs`
+directly *works*, right up until the next regeneration silently reverts it. The header says so
+and there is a test asserting the types live in the emitter.
+
+**Rejected.** `serde` derives behind a feature flag — genuinely convenient, and it starts the
+dependency conversation OpenPartsCore's zero-dep decision exists to end; the JSON is right there
+and is canonical anyway. And emitting a Track 0 limit table in Oh-Ben-Claw's config format,
+which ADR-0010 already rejected and which stays rejected: writing another repo's format takes
+that format as a dependency.
+
+**Rejected, and this one is the sharpest.** Any `pub fn is_safe(...)` or similar predicate.
+Nothing in this crate may look like a safety authority — Track 0 is the safety authority, this
+is a data model, and a function named like a permission is precisely how those two get confused
+by a caller in a hurry. There is a test that fails if one appears.
+
+**What is still upstream's call.** Oh-Ben-Claw actually consuming the binding. That is the same
+unfinished half [[openpartscore]] has been waiting on since it shipped its own Rust crate — the
+registry contract exists, and the consumer switching to it is a different repo's decision.
