@@ -416,3 +416,83 @@ by a caller in a hurry. There is a test that fails if one appears.
 **What is still upstream's call.** Oh-Ben-Claw actually consuming the binding. That is the same
 unfinished half [[openpartscore]] has been waiting on since it shipped its own Rust crate — the
 registry contract exists, and the consumer switching to it is a different repo's decision.
+
+---
+
+## [2026-08-22] ingest | The last sourcing topic closes by proving the number does not apply
+
+Gearbox efficiency was held to the end of the reading list on purpose. Every other topic
+licensed a **decision**, and a decision can rest on a survey. This one would license a **number**
+— an efficiency multiplies a derived capacity and turns ADR-0004's static upper bound into an
+estimate — so only a vendor document with a stated method was admissible.
+
+One was found: Harmonic Drive's FR Gearing engineering data. It closed the topic in two
+directions, neither expected.
+
+**Efficiency is a five-variable curve, in the vendor's own words:** *"Efficiency varies depending
+on input speed, ratio, load level, temperature, and type of lubrication."* Eight charts, no
+scalar. And the curves are themselves conditional — published at the torque rated for 2,000 rpm,
+then corrected again by a load factor. The worked example lands at **58% at rated load and 50% at
+60% of rated**, against the "80 to 90 percent" the trade literature quotes. The rule of thumb is
+not imprecise; on the vendor's own figures it is wrong by nearly a factor of two, in the unsafe
+direction.
+
+So `gearbox.efficiency` as a scalar was the **third instance of the same defect**: a quantity
+varying over an operating envelope, stored as one number. ADR-0004 deleted scalar `payload_kg`
+because capacity varies with pose. ADR-0014 made torque an array because it varies with voltage.
+Three times now, and the pattern is worth naming: *whenever a field holds one number for a
+quantity that has an operating envelope, the field is wrong and the envelope is the fix.*
+
+**But the sharper half is that efficiency does not apply here at all.** Efficiency curves
+describe a gearbox that is **turning** — they are indexed by input speed and published at
+1,000–2,000 rpm. `hold` is a *static* derivation, and a mechanism holding a pose has an input
+speed of **zero**. There is no efficiency curve at zero speed. What governs a stationary
+geartrain is starting and backdriving torque, which the same document publishes as separate
+tables of ranges spanning better than an order of magnitude.
+
+Applying a running efficiency to a held pose would be wrong **in kind**, not in value. So the
+last open sourcing topic closes by establishing that the number it would have licensed does not
+apply to the computation it was wanted for — and ADR-0004's bound stays a bound for a *sourced*
+reason rather than an unmodelled one. The ROADMAP entry moves from "gearbox efficiency" to
+"starting and backdriving torque", which is a different field nobody has yet needed.
+
+**And a distinction the platform has never made.** On torsional stiffness, the same vendor:
+*"The values quoted are the average of many tests of actual units. The spring rate of an
+individual unit may vary within approximately ±30% of the average."*
+
+A cited value has meant "somebody published it, and here is where" everywhere in this platform.
+This is a vendor stating **in a datasheet** that their published number describes a *population*
+and an individual specimen may sit 30% away from it. A `mass_g` from a datasheet and a `mass_g`
+from a scale are different kinds of claim, they currently validate identically, and a derivation
+chaining several model-typical figures compounds a spread nobody declared.
+
+ADR-0018 adds `basis` — `model-typical` or `this-unit`, absent meaning unknown — plus an optional
+`spread_pct`, and makes **a derivation report the weakest basis it consumed**. That last part is
+the expensive one and the reason the ADR is worth writing: most answers now grow a line saying
+they rest partly on population averages, which is unglamorous and true.
+
+**Deliberately not done:** sweeping `basis` across the other schemas. Applying it to `mass_g` and
+the rest without a source per field would be guessing at which values are population figures —
+the exact error the field exists to prevent.
+
+**Also found, and recorded rather than fixed.** The vendor's method statement for starting and
+backdriving torque — *"based on actual tests with the component sets assembled in their housings,
+and inclusive of friction resistance of oil seals, and churning of oil"* — is the reference
+example of the `how_determined` standard this repo asks for, written by a vendor. Worth keeping.
+And the "no standard governs backlash measurement" claim is **secondary-sourced only**; it is
+consistent with everything primary here and is not strong enough to build a rule on, so backlash
+gained nothing this pass.
+
+**A debt this pass exposed.** OpenCircuitCore, ClawCam and Project BINGO were read on 2026-08-22
+during the platform survey and **none of them has an entity page**. The index said they were
+unread, which was false. Corrected, and the gap recorded in [[open-questions]] with what was
+actually learned — notably that BINGO's `REFUSAL-CATEGORIES.md` is what question 5 has been
+waiting for. The wiki's own ingest rule says a source that touches pages updates them in the same
+pass; this one did not, twice over.
+
+**The reading list is now empty.** That is not the same as the wiki being finished. It means
+every question written down at the start has a source behind its answer. Three of the eight
+closed as *refusals* — self-collision, workspace volume, efficiency-for-static-hold — and a topic
+answered by establishing that the thing should not be done is answered. The next questions will
+arrive the way ADR-0014 and ADR-0018 both did: from one datasheet meeting one schema field, not
+from thinking harder.

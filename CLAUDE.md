@@ -36,6 +36,9 @@ These are decided. If a change would introduce one, it needs a superseding ADR, 
 | A `can` verdict | Sampled reach is sound positive, static capacity sound negative; no combination yields a provable yes | ADR-0015 |
 | An MCP tool taking a filesystem path | That is an arbitrary file read wearing a domain-specific name | ADR-0016 |
 | An MCP tool that repairs what `validate` finds | A write to `data/` is a person's judgement about physical hardware | ADR-0016 |
+| A scalar `gearbox.efficiency` | Efficiency varies with input speed, ratio, load, temperature and lubricant — eight curves, no scalar | ADR-0018 |
+| A running efficiency applied to a static hold | Efficiency curves are indexed by input speed; a held pose has none. Wrong in kind, not in value | ADR-0018 |
+| Treating a catalogue figure as a fact about your unit | A vendor may be publishing a population average — ±30% unit-to-unit is stated in one datasheet | ADR-0018 |
 
 ## Units
 
@@ -56,9 +59,9 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 
 ## Status
 
-Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), seventeen ADRs, six stdlib
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), eighteen ADRs, six stdlib
 scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`, `emit_rust`), an MCP
-surface and a zero-dependency Rust binding. 122 Python tests, 21 Rust tests. `data/` holds one
+surface and a zero-dependency Rust binding. 132 Python tests, 24 Rust tests. `data/` holds one
 real actuator record; no robot record yet, and that one needs hardware in hand.
 
 Do not write a README claim the code does not support. Equally: do not leave a status claim

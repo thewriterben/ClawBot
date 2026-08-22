@@ -15,7 +15,7 @@ Catalogue of every page in this wiki. Read this first when answering a question,
 - [[openpartscore]] — the canonical parts registry. Its `electronic/sg90` proved the actuator boundary: identity, bus and capabilities upstream; torque, speed and travel here
 - [[oh-ben-claw]] — the embodied runtime; likely consumer, confirmed to have no robot model of its own
 
-**Not yet written**, because nothing has been read: OpenCircuitCore, ClawCam, Project BINGO. See [[open-questions]].
+**Read on 2026-08-22 but not written up**: OpenCircuitCore, ClawCam, Project BINGO. An outstanding debt against this wiki's own ingest rule — what was learned is held in ADRs and commit messages instead of entity pages. Recorded in [[open-questions]].
 
 ## Sources
 
@@ -31,6 +31,7 @@ Catalogue of every page in this wiki. Read this first when answering a question,
 - [[dynamixel-xm430]] — a good vendor states that stall is not continuous, then publishes only stall. ADR-0004 confirmed on real evidence (2026-08-22)
 - [[forward-kinematics]] — Lynch and Park; the product of exponentials, and why a third representation ADR-0005 never considered does not reopen it (2026-08-22)
 - [[workspace-and-collision]] — sampling is inner-bounded and under-claims, which is the direction this repo may be wrong in; self-collision stays refused and can now say why (2026-08-22)
+- [[gearbox-efficiency]] — efficiency is a five-variable curve, not a scalar; it does not apply to a static hold at all; and a vendor states its published stiffness varies ±30% unit to unit (2026-08-22)
 
 ## The empty half, revisited
 
@@ -39,17 +40,20 @@ exist. None of the sources is copied into `raw/robotics/` — each has a stable 
 there with a retrieval date, per the rule in
 [`raw/platform/README.md`](raw/platform/README.md).
 
-Seven of the eight sourcing topics are now answered. The one still open is **gearbox efficiency
-and backlash** — and it is the only one where a source would license a *number* rather than a
-*decision*, which is why a secondary source will not do for it. Named in [[open-questions]].
+**All eight sourcing topics are answered**, as of 2026-08-22. The reading list is empty.
 
-Two of the answers were *refusals* rather than features, and that counts as the topic being
-closed: self-collision needs link geometry this repo deliberately does not carry, and a workspace
-volume is a boundary claim in disguise.
+Three of the answers were *refusals* rather than features, and each counts as closed:
+self-collision needs link geometry this repo deliberately does not carry; a workspace volume is a
+boundary claim in disguise; and a running gearbox efficiency does not describe a stationary
+geartrain, so it is the wrong quantity for `hold` rather than a missing one.
+
+An empty reading list is not a finished wiki. It means every question written down at the start
+has a source behind its answer. The next ones will arrive from data — ADR-0014 and ADR-0018 both
+came from a single datasheet meeting a single schema field, not from thinking harder.
 
 ## Counts
 
-4 concepts, 5 entities, 9 source summaries, 5 log entries. One real record in `data/`, cited to a vendor manual. 1 raw source copied locally; the rest cited by
+4 concepts, 5 entities, 10 source summaries, 6 log entries. One real record in `data/`, cited to a vendor manual. 1 raw source copied locally; the rest cited by
 repo-relative path or by URL with a retrieval date.
 
 Evidence quality is not uniform and the pages say so individually. The URDF pages rest on a

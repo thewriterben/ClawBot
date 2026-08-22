@@ -341,6 +341,56 @@ def test_interpolation_between_published_rows_is_refused():
     assert "12.0" in verdict["detail"] and "14.8" in verdict["detail"]
 
 
+# ----------------------------------------- ADR-0018: the answer names its weakest input
+
+def hold_with(actuator_doc):
+    robot = single_joint(tool_mass_g=100)
+    robot["joints"][0].pop("limits")
+    robot["joints"][0]["actuator_id"] = "a"
+    original, original_volts = kin.load_actuator, kin.supply_volts
+    with_actuator(actuator_doc, volts=12.0)
+    try:
+        return kin.hold_verdict(robot, {"j1": 0}, 0)
+    finally:
+        kin.load_actuator, kin.supply_volts = original, original_volts
+
+
+CONT = [{"value": 1.0, "at_volts": 12.0, "how_determined": "datasheet continuous rating"}]
+
+
+def test_an_undeclared_basis_is_reported_as_unknown_not_assumed_exact():
+    verdict = hold_with({"actuator_id": "a", "continuous_torque_nm": CONT})
+    assert verdict["basis"] == "unknown"
+    assert "undeclared" in verdict["basis_note"]
+
+
+def test_a_model_typical_input_makes_the_whole_answer_model_typical():
+    verdict = hold_with({"actuator_id": "a", "continuous_torque_nm": CONT,
+                         "gearbox": {"basis": "model-typical", "spread_pct": 30}})
+    assert verdict["basis"] == "model-typical"
+    assert "PRODUCT LINE" in verdict["basis_note"]
+
+
+def test_a_measured_input_says_so():
+    verdict = hold_with({"actuator_id": "a", "continuous_torque_nm": CONT,
+                         "gearbox": {"basis": "this-unit"}})
+    assert verdict["basis"] == "this-unit"
+
+
+def test_capacity_from_a_declared_effort_limit_has_no_actuator_basis():
+    verdict = kin.hold_verdict(single_joint(tool_mass_g=100), {"j1": 0}, 0)
+    assert verdict["basis"] == "no-actuator-inputs"
+
+
+def test_efficiency_is_called_inapplicable_rather_than_missing():
+    """ADR-0018: a running efficiency is the wrong quantity for a static hold,
+    not an unmodelled one. The distinction is the whole finding."""
+    verdict = kin.hold_verdict(single_joint(), {"j1": 0}, 0)
+    assert "INAPPLICABLE" in verdict["bound_note"]
+    assert "input speed" in verdict["bound_note"]
+    assert "starting and backdriving torque" in verdict["bound_note"]
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_")]
     failed = 0

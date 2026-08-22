@@ -40,7 +40,9 @@
 - A learned policy surface: action-space definitions, simulation export, dataset schemas. Rejected in ADR-0010 as a second product rather than a schema change, not as a bad idea. A real request pulls it forward.
 - Cable mechanics. `service_loop_mm` is recorded and feeds nothing, because relating slack to permitted travel needs bend-radius behaviour under load that has no source here (ADR-0012).
 - Dynamics, and the full inertia tensor URDF carries. ADR-0004 draws the line at static gravity load and says so in every answer; the URDF gap is recorded in `Knowledge/concepts/urdf-round-trip.md`.
-- Compliance, backlash, gearbox efficiency. Each turns an upper bound into an estimate, and each needs measured data — and gearbox efficiency is the last open sourcing topic for exactly that reason.
+- Compliance and backlash. Each turns an upper bound into an estimate, and each needs measured data.
+- **Starting and backdriving torque**, which is what a static hold would actually need. Not gearbox efficiency: ADR-0018 established that efficiency curves describe a gearbox that is *turning*, so they are the wrong quantity for a held pose. Harmonic Drive publishes starting and backdriving torque as ranges spanning better than an order of magnitude, so adding them means adding a range type, not a number.
+- **A `basis` sweep across the other schemas.** ADR-0018 introduced `model-typical` vs `this-unit` where a source forced it. Applying it to `mass_g` and the rest without a source per field would be guessing at which values are population figures — the exact error the field exists to prevent.
 
 ## Not ever
 - A `reach_mm` field (ADR-0003).

@@ -2,7 +2,7 @@
 
 Describe a robot once — links, joints, actuators, and where every number came from. Then ask what it can actually reach, and what it can actually hold there.
 
-**Status:** pre-alpha. Four schemas, seventeen ADRs, six scripts, an MCP surface, a zero-dependency Rust binding, **122 Python tests and 21 Rust tests**, and a knowledge base whose robotics half is no longer empty. `data/` holds one real record — a Dynamixel XM430-W350, written from the vendor's own manual, whose continuous torque is `null` because ROBOTIS names the stall/continuous distinction and then publishes only stall. No robot record yet: that needs a real mechanism in hand, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
+**Status:** pre-alpha. Four schemas, eighteen ADRs, six scripts, an MCP surface, a zero-dependency Rust binding, **132 Python tests and 24 Rust tests**, and a knowledge base whose robotics half is no longer empty. `data/` holds one real record — a Dynamixel XM430-W350, written from the vendor's own manual, whose continuous torque is `null` because ROBOTIS names the stall/continuous distinction and then publishes only stall. No robot record yet: that needs a real mechanism in hand, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
 
 ```
 python scripts/validate.py                     # uncited claims, degrees in _rad, non-trees
@@ -13,8 +13,8 @@ python scripts/affordance.py <id> --target X,Y,Z --payload-g N   # can this body
 python scripts/urdf.py import <file.urdf>      # reads the XML, not the parsed tree
 python -m clawbot_mcp.server                   # the same answers over MCP
 python scripts/emit_rust.py --check            # is the committed binding stale?
-python -m pytest tests/ -q                     # 122 tests
-cd bindings/rust && cargo test                 # 21 more, 3 of them compile_fail
+python -m pytest tests/ -q                     # 132 tests
+cd bindings/rust && cargo test                 # 24 more, 3 of them compile_fail
 ```
 
 The tests are the interesting part. 31 are negative — every rule with teeth, proven to bite. 26 are known answers rather than pinned outputs: a 1 kg mass on a 100 mm arm loads the joint with 0.980665 N⋅m whether or not this code has ever run. 19 run the URDF round trip that [ADR-0007](DECISIONS.md) makes claims about, including one asserting that provenance *does not* survive it. 16 guard the affordance composition, one of them named `test_there_is_no_can_verdict_anywhere`. 10 guard the MCP surface against the two ways it would quietly go wrong — a tool that takes a file path, and a tool that strips its caveats. And two validate emitted output against **OpenBuildCore's own schema file**, not a copy of it — skipping honestly if that repo is not checked out beside this one.

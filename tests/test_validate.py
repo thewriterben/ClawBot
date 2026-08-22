@@ -351,6 +351,48 @@ def test_unchecked_cable_run_warns_loudly():
     assert warns(report, "NOBODY CHECKED")
 
 
+# ------------------------------------------------- ADR-0018: efficiency and basis
+
+def actuator(**over):
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC}
+    doc.update(over)
+    return doc
+
+
+def test_scalar_gearbox_efficiency_is_refused():
+    """The third instance of the same defect: a quantity varying over an operating
+    envelope, stored as one number."""
+    doc = actuator(gearbox={"ratio": 100, "efficiency": 0.85})
+    assert refuses(run("actuator", doc), "scalar and was removed")
+
+
+def test_measured_efficiency_without_a_method_is_refused():
+    doc = actuator(gearbox={"ratio": 100, "measured_efficiency": [
+        {"value": 0.58, "input_speed_rad_s": 104.7, "output_torque_nm": 294,
+         "how_determined": "  "}]})
+    assert refuses(run("actuator", doc), "no how_determined")
+
+
+def test_efficiency_at_zero_input_speed_warns_that_it_is_the_wrong_quantity():
+    """A held pose has zero input speed, and there is no efficiency curve there."""
+    doc = actuator(gearbox={"ratio": 100, "measured_efficiency": [
+        {"value": 0.58, "input_speed_rad_s": 0, "output_torque_nm": 294,
+         "how_determined": "chart 3, FR gearing engineering data"}]})
+    report = run("actuator", doc)
+    assert report.failures == []
+    assert warns(report, "gearbox that is TURNING")
+
+
+def test_model_typical_without_a_spread_warns_the_width_is_unknown():
+    doc = actuator(gearbox={"ratio": 100, "basis": "model-typical"})
+    assert warns(run("actuator", doc), "population of unknown width")
+
+
+def test_a_spread_without_a_basis_warns():
+    doc = actuator(gearbox={"ratio": 100, "spread_pct": 30})
+    assert warns(run("actuator", doc), "no basis")
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_")]
     failed = 0

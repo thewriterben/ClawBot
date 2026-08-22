@@ -361,6 +361,32 @@ def check_actuator(path: Path, report: Report) -> str | None:
     if gearbox.get("backlash_rad") == 0:
         report.warn(where, "gearbox.backlash_rad is 0 — absent means UNKNOWN; a "
                            "measured zero is extraordinary and needs its method")
+    if "efficiency" in gearbox:
+        report.fail(where, "gearbox.efficiency is a scalar and was removed (ADR-0018). "
+                           "Efficiency varies with input speed, ratio, load, temperature "
+                           "and lubricant — use measured_efficiency, which requires the "
+                           "operating point that makes a figure mean something")
+
+    # ADR-0018: a value may describe a product line or the unit on your bench.
+    for row in gearbox.get("measured_efficiency") or []:
+        speed = row.get("input_speed_rad_s")
+        if not (row.get("how_determined") or "").strip():
+            report.fail(where, "measured_efficiency row has no how_determined")
+        if speed == 0:
+            report.warn(
+                where,
+                "measured_efficiency at zero input speed: published efficiency curves "
+                "describe a gearbox that is TURNING. What governs a stationary geartrain "
+                "is starting and backdriving torque, which are different quantities "
+                "(ADR-0018)")
+    if gearbox.get("spread_pct") is not None and gearbox.get("basis") is None:
+        report.warn(where, "gearbox.spread_pct is declared with no basis — a spread is a "
+                           "statement about a population, so the basis should say "
+                           "'model-typical'")
+    if gearbox.get("basis") == "model-typical" and gearbox.get("spread_pct") is None:
+        report.warn(where, "gearbox.basis is model-typical with no spread_pct: the "
+                           "figure describes a population of unknown width. Absent means "
+                           "UNKNOWN, not zero (ADR-0018)")
 
     return act.get("actuator_id")
 

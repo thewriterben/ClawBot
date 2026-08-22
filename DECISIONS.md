@@ -883,3 +883,108 @@ needs serialisation, the JSON is right there and is the canonical form anyway.
 Rejected: emitting a `pub fn is_safe(...)` or any predicate that answers a safety question.
 Nothing in this crate may look like a safety authority. Track 0 is the safety authority, this is
 a data model, and a function named like a permission is how those two get confused.
+
+---
+
+## ADR-0018 — A cited value may describe a population rather than your unit, and efficiency does not apply to a static hold
+
+**Date:** 2026-08-22
+**Status:** accepted (closes the last sourcing topic; refines ADR-0004 without loosening it)
+
+**Context.** Eight sourcing topics were opened when this repo was created. Seven closed quickly.
+Gearbox efficiency and backlash was held to last on purpose: every other topic licensed a
+**decision**, and a decision can rest on a survey, but this one would license a **number** — an
+efficiency multiplies a derived capacity and turns ADR-0004's static upper bound into an
+estimate. Only a vendor document with a stated method was admissible.
+
+One was found and read: Harmonic Drive's FR Gearing engineering data
+([`Knowledge/sources/gearbox-efficiency.md`](Knowledge/sources/gearbox-efficiency.md)). It
+closes the topic in two directions, neither of them the expected one.
+
+### Efficiency is a five-variable curve, and the schema field is a scalar
+
+> "Efficiency varies depending on input speed, ratio, load level, temperature, and type of
+> lubrication."
+
+Eight charts, no scalar. And the curves are themselves conditional — published for units at the
+torque rated for 2,000 rpm, then corrected by a load-compensation factor. The document's worked
+example lands at **58% at rated load, and 50% at 60% of rated**, against the "80 to 90 percent"
+the secondary literature quotes. The rule of thumb is not imprecise here; on the vendor's own
+figures it is wrong by nearly a factor of two, in the unsafe direction.
+
+`gearbox.efficiency` is a `number` in [0,1]. That is the third time this repo has found the same
+defect: a quantity that varies over an operating envelope, stored as one number. ADR-0004 deleted
+scalar `payload_kg` because capacity varies with pose. ADR-0014 made torque an array because it
+varies with voltage. This is the same shape again.
+
+### Efficiency does not apply to the computation it was wanted for
+
+The sharper half. Efficiency curves describe a gearbox that is **turning** — they are indexed by
+input speed and published at 1,000–2,000 rpm. ClawBot's `hold` is a *static* derivation, and a
+mechanism holding a pose has an input speed of **zero**. There is no efficiency curve at zero
+speed. What governs a stationary geartrain is starting torque and backdriving torque, which the
+same document publishes as separate tables of **ranges spanning better than an order of
+magnitude** (FR 40: starting 3–50 N·cm, backdriving 7–190 N·m).
+
+Applying a running efficiency to a static hold would be wrong **in kind**, not in value.
+
+### And a distinction this platform has never made
+
+On torsional stiffness, the same vendor:
+
+> "The values quoted are the average of many tests of actual units. The spring rate of an
+> individual unit may vary within approximately ±30% of the average."
+
+A cited value has meant, everywhere in this platform so far, "somebody published it, and here is
+where". This is a vendor stating in a datasheet that their published number describes a
+**population**, and that an individual specimen may sit 30% away from it.
+
+Those are different kinds of claim and nothing here distinguishes them. A `mass_g` from a
+datasheet is a model-typical figure. A `mass_g` from a scale is a fact about the object on the
+bench. Both currently validate identically and read identically downstream, and a derivation
+that chains several model-typical figures compounds a spread nobody declared.
+
+**Decision.**
+
+1. **`gearbox.efficiency` as a scalar is removed.** In its place, `measured_efficiency` — an
+   array of points, each requiring the operating conditions that make it meaningful:
+   `input_speed_rad_s`, `output_torque_nm`, `temperature_c`, `lubricant`, and `how_determined`.
+   Same shape as `measured_payload` and for the same reason. A vendor curve may be sampled into
+   it; a single catalogue number may not, because there is no such thing.
+2. **Efficiency still feeds no derivation, and now for a sourced reason.** ADR-0004 said "not
+   modelled" and left it as a gap to be closed later. It is not a gap: a running efficiency is
+   the wrong quantity for a static hold. `hold` remains a static upper bound, and the ROADMAP
+   entry moves from "not yet" to a scoped statement of what would actually be needed —
+   starting and backdriving torque, which are different fields nobody has yet had a reason to add.
+3. **Every field that can carry a physical value gains an optional `basis`**, one of
+   `model-typical` or `this-unit`, plus an optional `spread_pct` for the former where the vendor
+   states one. Absent means **unknown**, per invariant #3 — not "assumed exact".
+4. **A derivation reports the weakest basis it consumed.** If any input is `model-typical`, the
+   answer says so. A verdict built from population averages is not the same claim as one built
+   from measurements of the specific hardware, and ADR-0015's margin is meaningless without
+   knowing which it is.
+5. **Backlash keeps its `_rad` field and gains nothing**, because the "no measurement standard"
+   finding is secondary-sourced and not strong enough to build a rule on. It is recorded as
+   believed and under-sourced in the source page, and it is the one thing in this topic still
+   worth a primary source.
+
+**Consequences.** Point 4 is the expensive one and the reason this ADR is worth writing. It
+means most derived answers will grow a line saying they rest partly on population averages,
+which is unglamorous and true. It also means the platform now has a vocabulary for something it
+could not previously express: the difference between a number that describes a product line and
+a number that describes your hardware.
+
+That distinction is almost certainly not confined to gearboxes. It probably applies to
+`mass_g` on links, to actuator mass, and to any figure read from a catalogue rather than a
+scale. This ADR introduces the field and applies it where a source has forced the issue; a sweep
+across the other schemas is deliberately **not** done here, because doing it without a source per
+field would be guessing at which values are population figures — the exact error the field
+exists to prevent.
+
+**Rejected:** modelling efficiency from the published curves by fitting them. The curves are
+per-model, per-lubricant, per-ratio, and reading a value off a chart image is not a citation.
+
+**Rejected:** a default `basis: model-typical` for any value carrying a vendor URL. It would be
+right most of the time, which is what makes it dangerous — the cases where it is wrong are
+precisely the measured ones a user took trouble over, and silently relabelling those as
+population figures would discard the better evidence.

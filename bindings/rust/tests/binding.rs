@@ -258,6 +258,45 @@ fn a_link_declares_exactly_one_kind() {
     }
 }
 
+// ------------------------------------------------- ADR-0018: population vs unit
+
+#[test]
+fn an_undeclared_basis_is_none_and_none_means_unknown() {
+    // Not "assumed exact". A vendor may be publishing a population average —
+    // Harmonic Drive states ±30% unit-to-unit on torsional stiffness — and a
+    // consumer has to be made to notice that nobody said which this is.
+    for actuator in ACTUATORS {
+        if actuator.basis.is_none() {
+            assert!(
+                actuator.spread_pct.is_none(),
+                "{} declares a spread without saying what it is a spread of",
+                actuator.id
+            );
+        }
+    }
+}
+
+#[test]
+fn basis_round_trips_through_its_string() {
+    assert_eq!(Basis::ModelTypical.as_str(), "model-typical");
+    assert_eq!(Basis::ThisUnit.as_str(), "this-unit");
+}
+
+#[test]
+fn there_is_no_efficiency_field_to_reach_for() {
+    // Asserted by construction: `Actuator` has no `efficiency`, so the line
+    //
+    //     let _ = ACTUATORS[0].efficiency;
+    //
+    // does not compile. Its absence is a decision (ADR-0018), not an omission —
+    // efficiency curves describe a gearbox that is turning, and a static hold has
+    // an input speed of zero. This test exists to carry that note next to the
+    // data rather than only in an ADR.
+    for actuator in ACTUATORS {
+        let _ = actuator.gear_ratio; // the field that DOES exist and is a scalar
+    }
+}
+
 #[test]
 fn millimetres_convert_to_metres_at_one_named_place() {
     assert!((Millimetres(1000.0).to_metres() - 1.0).abs() < 1e-12);

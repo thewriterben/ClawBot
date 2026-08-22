@@ -10,7 +10,7 @@ sources:
 
 # Open questions
 
-Two lists. The first is what needs **falsifying** — decisions already recorded that were made without evidence. The second is what needs **reading** — the empty half of this wiki.
+Two lists. The first is what needs **falsifying** — decisions already recorded that were made without evidence. The second is what needed **reading**, and is now empty of sourcing topics.
 
 Ordered by how expensive the mistake gets if left alone.
 
@@ -93,18 +93,33 @@ A mechanism repo needs one more obviously than a parts registry does. Requires r
 
 ## The reading list
 
-`raw/robotics/` is empty and so is every domain page. This is deliberate — see the "empty half" section of [`../CLAUDE.md`](../CLAUDE.md) — and this list is what fills it. **Nothing in the repo should be built on recall while this list is untouched.**
+`raw/robotics/` was empty and so was every domain page. Six sources were ingested on 2026-08-22 and **all eight sourcing topics are now closed**. The rule that emptied the directory has not stopped applying: nothing here is built on recall, and a new page still waits for a source.
 
-### Already on disk, not yet read
+### Read but not written up — an outstanding debt
 
-Cheapest first; these need no sourcing, only time.
+**OpenCircuitCore, ClawCam and Project BINGO were read on 2026-08-22** during the platform survey
+that opened this work. None of them has an entity page, and the index still says they are
+unread. That is a real gap in this wiki's own bookkeeping and is recorded here rather than
+quietly corrected, because the wiki's ingest rule says a source that touches pages should update
+them in the same pass.
+
+What was learned and is currently held only in commit messages and ADRs:
+
+- **Project BINGO** owns the PD-5 refusal taxonomy in `v3/specs/REFUSAL-CATEGORIES.md`, and two of
+  its categories land directly on a mechanism repo — `weapons.other` (refuse network-wide) and
+  `regulated.medical` (load-bearing prosthetics). It names design-time assistants as bound by the
+  same vocabulary. This is what question 5 below needs.
+- **OpenCircuitCore** is KiCad-direct with netlist-as-source, and emits provenance per build. Its
+  `pcb export step|stl` is the board→enclosure path. An arm's wiring is a real constraint on its
+  joint travel (ADR-0012), so the two repos touch more than expected.
+- **ClawCam** is the perception peer, with a read-free / write-gated MCP approval model that
+  ADR-0016 arrived at independently.
+
+### Still on disk, not yet read
 
 - [[oh-ben-claw]] `docs/SOTA-COMPARISON.md` — a component-by-component benchmark against ROS 2 Nav2, slam_toolbox, Cartographer, AMCL, BehaviorTree.CPP and Open-RMF. The closest thing on disk to a robotics state-of-the-art survey.
-- [[oh-ben-claw]] `docs/EMBODIED-ARCHITECTURE.md`, `docs/ECOSYSTEM-INTEGRATION.md`, `Knowledge Base/` — see question 2 above.
+- [[oh-ben-claw]] `docs/EMBODIED-ARCHITECTURE.md`, `Knowledge Base/`.
 - Oh-Ben-Claw's README past the four-control-modes table (~770 lines unread), plus `registry/`.
-- **OpenCircuitCore** — the only peer with no entity page, because none of it has been read. An arm's wiring is a real constraint on its joint travel.
-- ClawCam — the perception peer; relevant if a mechanism ever needs to know where its target is.
-- Project BINGO — machine records, capability tiers, and the PD-5 taxonomy.
 
 ### Needs sourcing
 
@@ -120,11 +135,21 @@ No page gets written from these headings until a citable source exists behind it
 | ~~Forward kinematics~~ | The computation ADR-0003 promises | **done** — Lynch and Park → [[forward-kinematics]]. Turned up a third representation ADR-0005 never considered; see below. |
 | ~~Workspace determination~~ | Whether reach is sampled or solved — needed its own ADR | **done** — [[workspace-and-collision]] → ADR-0013. Sampled, because a sampled set is inner-bounded and under-claims. |
 | ~~Self-collision~~ | Named in ADR-0003 as why computed reach over-claims | **done** — [[workspace-and-collision]]. Outcome is a *refusal*: it needs link geometry this repo does not carry, plus an allowed-collision matrix nobody has authored. The caveat can now name why. |
-| Gearbox efficiency and backlash; harmonic and cycloidal drives | Turns an upper bound into an estimate; fields exist on the strength of the names alone | **open** — vendor data with method. The last one. |
+| ~~Gearbox efficiency and backlash~~ | Would turn an upper bound into an estimate | **done** — Harmonic Drive engineering data → [[gearbox-efficiency]], ADR-0018. It does **not** turn the bound into an estimate: efficiency curves are indexed by input speed and a static hold has none, so a running efficiency is the wrong quantity in kind. |
 
-**Seven of eight answered.** The remaining one is the only topic where a source would license a
-*number* rather than a *decision*, which is why it is also the one where a secondary source will
-not do.
+**All eight answered, as of 2026-08-22.** The last one was held to the end because it was the
+only topic where a source would license a *number* rather than a *decision*, and it closed in the
+most useful way available: by establishing that the number does not apply to the computation it
+was wanted for.
+
+Two of the eight closed as **refusals** — self-collision needs geometry this repo does not carry,
+and a running efficiency does not describe a stationary geartrain. A topic answered by
+establishing that the thing cannot or should not be done is a topic answered.
+
+**The reading list is empty. That is not the same as the wiki being finished** — it means every
+question written down at the start has a source behind its answer. New questions will arrive from
+data, the way ADR-0014 and ADR-0018 both did: not from thinking harder, but from one datasheet
+meeting one schema field.
 
 ### 6. Product of exponentials was never considered — **resolved, no change needed**
 

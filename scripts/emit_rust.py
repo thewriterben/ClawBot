@@ -345,6 +345,34 @@ impl Robot {
     }
 }
 
+/// Whether a value describes the **product line** or the **unit on your bench**
+/// (ADR-0018).
+///
+/// Not pedantry. Harmonic Drive states in a datasheet that its published torsional
+/// stiffness is "the average of many tests of actual units" and that "the spring
+/// rate of an individual unit may vary within approximately ±30% of the average".
+/// A cited value has meant "somebody published it" everywhere else in this
+/// platform; this is a vendor saying their number describes a population.
+///
+/// Carried as `Option<Basis>`, and `None` means **unknown** — never "assumed
+/// exact". A derivation must report the weakest basis it consumed.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Basis {
+    /// Describes a product line. An individual unit may sit outside it.
+    ModelTypical,
+    /// Measured on the specific hardware.
+    ThisUnit,
+}
+
+impl Basis {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Basis::ModelTypical => "model-typical",
+            Basis::ThisUnit => "this-unit",
+        }
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Actuator {
     pub id: &'static str,
@@ -363,7 +391,21 @@ pub struct Actuator {
     /// achieved pose differ.
     pub backlash_rad: Option<Radians>,
     pub mass_g: Option<f64>,
+    /// Whether this actuator's figures describe the product line or your unit.
+    /// `None` is unknown, and a derivation consuming it must say so (ADR-0018).
+    pub basis: Option<Basis>,
+    /// Unit-to-unit variation the vendor states, as a percentage. `None` means the
+    /// spread is unknown, not zero.
+    pub spread_pct: Option<f64>,
 }
+
+// NOTE: there is no `efficiency` field, and its absence is a decision rather than
+// an omission (ADR-0018). Efficiency varies with input speed, ratio, load,
+// temperature and lubricant — Harmonic Drive publishes eight curves and no scalar
+// — and, more to the point, efficiency curves describe a gearbox that is TURNING.
+// A static hold has an input speed of zero, where no efficiency curve exists.
+// What governs a stationary geartrain is starting and backdriving torque, which
+// this crate does not carry because nothing has yet needed them.
 
 impl Actuator {
     /// The continuous rating at exactly this supply voltage, if one was published.
@@ -487,6 +529,13 @@ def render_robot(robot: dict) -> str:
     )
 
 
+def basis_rs(value) -> str:
+    if value is None:
+        return "None"
+    return {"model-typical": "Some(Basis::ModelTypical)",
+            "this-unit": "Some(Basis::ThisUnit)"}[value]
+
+
 def render_actuator(act: dict) -> str:
     stall = "".join(
         f"            StallTorque {{ newton_metres: {float(r['value'])!r}_f64, "
@@ -513,6 +562,9 @@ def render_actuator(act: dict) -> str:
         + ("None" if backlash is None else f"Some(Radians({float(backlash)!r}_f64))")
         + ",\n"
         f"        mass_g: {rs_f64(act.get('mass_g'))},\n"
+        f"        basis: {basis_rs(gearbox.get('basis') or act.get('basis'))},\n"
+        f"        spread_pct: "
+        f"{rs_f64(gearbox.get('spread_pct') or act.get('spread_pct'))},\n"
         "    },\n"
     )
 

@@ -475,10 +475,15 @@ def hold_verdict(robot: dict, pose: dict, payload_g: float) -> dict:
                     f"Absent means the derivation reports incomplete, never zero."))
 
     results, binding = [], None
+    bases: list = []                           # ADR-0018: report the weakest basis used
     for joint in robot.get("joints", []):
         if joint.get("type") not in ("revolute", "continuous"):
             continue
         jid = joint["joint_id"]
+        if joint.get("actuator_id"):
+            actuator = load_actuator(joint["actuator_id"]) or {}
+            bases.append((actuator.get("gearbox") or {}).get("basis")
+                         or actuator.get("basis"))
         try:
             capacity = joint_capacity_nm(joint, volts)
         except Incomplete as exc:
@@ -521,14 +526,44 @@ def hold_verdict(robot: dict, pose: dict, payload_g: float) -> dict:
         return dict(base, verdict="incomplete", missing="revolute joints",
                     detail="no revolute joint carries a gravity load here")
 
+    # The weakest basis consumed. Unknown beats model-typical beats this-unit,
+    # because the answer is only as specific as its vaguest input (ADR-0018).
+    if not bases:
+        weakest = "no-actuator-inputs"
+    elif any(b is None for b in bases):
+        weakest = "unknown"
+    elif any(b == "model-typical" for b in bases):
+        weakest = "model-typical"
+    else:
+        weakest = "this-unit"
+
+    basis_note = {
+        "unknown": ("at least one actuator does not declare whether its figures describe "
+                    "the product line or the unit on your bench. A vendor may publish a "
+                    "population average — Harmonic Drive states +/-30% unit-to-unit on "
+                    "torsional stiffness — so this margin's width is undeclared (ADR-0018)."),
+        "model-typical": ("every figure used describes a PRODUCT LINE, not the hardware "
+                          "you have. An individual unit may sit outside it by the declared "
+                          "spread, or by an undeclared one (ADR-0018)."),
+        "this-unit": "every figure used was measured on the specific hardware.",
+        "no-actuator-inputs": ("capacity came from declared joint effort limits rather "
+                               "than actuator data, so no actuator basis applies."),
+    }[weakest]
+
     return dict(
         base,
         verdict="holds" if all(r["holds"] for r in results) else "exceeds-capacity",
         bound="STATIC UPPER BOUND",
-        bound_note=("gravity load at a held pose. Acceleration, dynamic loading, "
-                    "gearbox efficiency, friction and backlash are NOT modelled, so "
-                    "the real capacity is LOWER than this (ADR-0004). This figure may "
-                    "never be printed without the word that makes it a bound."),
+        bound_note=("gravity load at a held pose. Acceleration, dynamic loading, friction "
+                    "and backlash are NOT modelled, so the real capacity is LOWER than "
+                    "this (ADR-0004). This figure may never be printed without the word "
+                    "that makes it a bound. Gearbox efficiency is not missing here but "
+                    "INAPPLICABLE: efficiency curves are indexed by input speed and a "
+                    "held pose has none, so what governs a stationary geartrain is "
+                    "starting and backdriving torque, which this repo does not carry "
+                    "(ADR-0018)."),
+        basis=weakest,
+        basis_note=basis_note,
         gravity_in_base=list(gravity),
         binding_joint=binding["joint_id"],
         joints=results,

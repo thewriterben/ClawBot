@@ -70,13 +70,29 @@
       "properties": {
         "ratio": { "type": "number", "exclusiveMinimum": 0 },
         "type": { "enum": ["spur", "planetary", "harmonic", "cycloidal", "worm", "belt", "none"] },
-        "backlash_rad": { "type": "number", "minimum": 0, "description": "Absent means UNKNOWN, never zero. Backlash is why a commanded pose and an achieved pose differ, and recording it as zero because nobody measured it is the invented-data failure in miniature." },
-        "efficiency": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "maximum": 1,
-          "description": "NOT used in any derivation at this stage - ADR-0004 draws the line at a static upper bound and says so in every answer. Recorded when a datasheet states it, so that the figure is already here when efficiency is modelled."
+        "backlash_rad": { "type": "number", "minimum": 0, "description": "Absent means UNKNOWN, never zero. Backlash is why a commanded pose and an achieved pose differ, and recording it as zero because nobody measured it is the invented-data failure in miniature. NOTE: trade sources report there is no standard governing how backlash is measured - averaging methods and applied torques differ between vendors - which would make two vendors' figures incomparable without their methods. That claim is SECONDARY-SOURCED and no rule is built on it yet (ADR-0018)." },
+        "measured_efficiency": {
+          "type": ["array", "null"],
+          "description": "Replaces a scalar efficiency field, which was the third instance of this repo's recurring defect: a quantity varying over an operating envelope, stored as one number (ADR-0018). Harmonic Drive's own engineering data states efficiency 'varies depending on input speed, ratio, load level, temperature, and type of lubrication' and publishes eight curves and no scalar - and its worked example lands at 58% at rated load and 50% at 60% of rated, against the 80-90% the trade literature quotes. STILL FEEDS NO DERIVATION, and now for a sourced reason rather than an unmodelled one: efficiency curves describe a gearbox that is TURNING, indexed by input speed, while a static hold has an input speed of zero. Applying a running efficiency to a held pose is wrong in kind, not in value. A vendor curve may be sampled into this array; a single catalogue number may not, because there is no such thing.",
+          "items": {
+            "type": "object",
+            "required": ["value", "input_speed_rad_s", "output_torque_nm", "how_determined"],
+            "properties": {
+              "value": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+              "input_speed_rad_s": { "type": "number", "minimum": 0, "description": "The operating point this figure was read at. Required, because it is the primary index of every published efficiency curve." },
+              "output_torque_nm": { "type": "number", "exclusiveMinimum": 0, "description": "Efficiency falls with load below rated; a figure without its load is not a figure." },
+              "temperature_c": { "type": "number" },
+              "lubricant": { "type": "string", "description": "Named grease or oil, and quantity where the vendor conditions the curve on it. Harmonic Drive's curves are valid only for their own grease at standard quantity." },
+              "how_determined": { "type": "string", "minLength": 1, "description": "Read from which chart of which document, or measured how. Reading a value off a chart image is not a citation and should say so." },
+              "basis": { "$ref": "#/$defs/basis" },
+              "spread_pct": { "$ref": "#/$defs/spreadPct" },
+              "source": { "$ref": "#/$defs/source" }
+            },
+            "additionalProperties": false
+          }
         },
+        "basis": { "$ref": "#/$defs/basis" },
+        "spread_pct": { "$ref": "#/$defs/spreadPct" },
         "source": { "$ref": "#/$defs/source" }
       },
       "additionalProperties": false
@@ -105,6 +121,15 @@
   "additionalProperties": false,
 
   "$defs": {
+    "basis": {
+      "enum": ["model-typical", "this-unit"],
+      "description": "Whether this value describes the PRODUCT LINE or the object on your bench (ADR-0018). The distinction is not pedantry: Harmonic Drive states in a datasheet that its published torsional stiffness is 'the average of many tests of actual units' and that 'the spring rate of an individual unit may vary within approximately +/-30% of the average'. A cited value has meant 'somebody published it' everywhere in this platform so far; this is a vendor saying their number describes a population. ABSENT MEANS UNKNOWN, never 'assumed exact' - and a derivation must report the weakest basis it consumed, because a verdict built from population averages is a different claim from one built from measurements of the specific hardware."
+    },
+    "spreadPct": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Unit-to-unit variation the vendor states for a model-typical figure, as a percentage of the value. Only ever a figure somebody published; absent means the spread is UNKNOWN, not zero."
+    },
     "torqueAtVolts": {
       "type": "object",
       "description": "One row of a published table. Voltage is not an annotation on the value - it is the index the value is looked up by, and a derivation that picks the wrong row is wrong by the width of the curve (ADR-0014).",
