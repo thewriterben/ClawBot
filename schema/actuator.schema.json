@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clawbot/actuator.schema.json",
+  "title": "Actuator",
+  "description": "What drives a joint. The one field that matters most is the one datasheets rarely publish: continuous_torque_nm. A hobby servo's headline number is stall torque - what it produces at the instant it stops moving, drawing a current it cannot sustain - and a model that reads it as capacity will confidently specify a mechanism that overheats. Only the continuous figure feeds a capacity derivation (ADR-0004).",
+  "type": "object",
+  "required": ["schema_version", "actuator_id", "type", "source"],
+  "properties": {
+    "schema_version": { "const": 0 },
+    "actuator_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "part_id": { "type": "string", "description": "The OpenPartsCore entry for this actuator, if it has one. Stored, not resolved (ADR-0006)." },
+    "make": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "type": {
+      "enum": ["hobby-servo", "smart-servo", "stepper", "bldc", "dc-gearmotor", "linear-actuator"],
+      "description": "hobby-servo takes a PWM pulse and reports nothing. smart-servo has a bus and position feedback. The distinction matters for what a controller can know, not only for what the motor can do."
+    },
+
+    "stall_torque_nm": {
+      "type": ["object", "null"],
+      "description": "The datasheet headline. Recorded because datasheets publish it and omitting the field invites someone to write it into continuous_torque_nm, NOT because it is usable. A validator must refuse to let this value reach a capacity derivation (ADR-0004).",
+      "required": ["value", "at_volts"],
+      "properties": {
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "at_volts": { "type": "number", "exclusiveMinimum": 0, "description": "Required. A torque figure without its supply voltage is not a figure - the same servo quoted at 6.0 V and 7.4 V differs substantially." },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
+
+    "continuous_torque_nm": {
+      "type": ["object", "null"],
+      "description": "The only torque that may feed a capacity derivation. Absent means capacity cannot be derived and the answer is 'incomplete', naming this actuator - the same shape as OpenBuildCore answering 'requires slicing' for a machine with no measured throughput (its ADR-0005). Most hobby datasheets do not publish this, so absence will be the common case; that is a true statement about the available evidence, not a gap to be filled with a fraction of stall torque.",
+      "required": ["value", "at_volts", "how_determined"],
+      "properties": {
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "at_volts": { "type": "number", "exclusiveMinimum": 0 },
+        "how_determined": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Datasheet continuous rating, or a measurement and its method. A rule of thumb applied to stall torque is not a determination and must be rejected here - it is a guess wearing a citation."
+        },
+        "thermal_basis": { "type": "string", "description": "Duty cycle, ambient, and whether steady state was reached. A torque held for ten seconds is not a continuous torque." },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
+
+    "no_load_speed_rad_s": {
+      "type": ["object", "null"],
+      "required": ["value", "at_volts"],
+      "properties": {
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "at_volts": { "type": "number", "exclusiveMinimum": 0 },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
+
+    "travel": {
+      "type": ["object", "null"],
+      "description": "The actuator's own travel, before any gearing. Distinct from the joint limits in the robot record: those are what the mechanism permits, this is what the motor can do. A capacity or reachability derivation takes the tighter of the two.",
+      "properties": {
+        "lower_rad": { "type": "number", "minimum": -12.57, "maximum": 12.57 },
+        "upper_rad": { "type": "number", "minimum": -12.57, "maximum": 12.57 },
+        "lower_mm": { "type": "number" },
+        "upper_mm": { "type": "number" },
+        "continuous_rotation": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+
+    "gearbox": {
+      "type": ["object", "null"],
+      "properties": {
+        "ratio": { "type": "number", "exclusiveMinimum": 0 },
+        "type": { "enum": ["spur", "planetary", "harmonic", "cycloidal", "worm", "belt", "none"] },
+        "backlash_rad": { "type": "number", "minimum": 0, "description": "Absent means UNKNOWN, never zero. Backlash is why a commanded pose and an achieved pose differ, and recording it as zero because nobody measured it is the invented-data failure in miniature." },
+        "efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "NOT used in any derivation at this stage - ADR-0004 draws the line at a static upper bound and says so in every answer. Recorded when a datasheet states it, so that the figure is already here when efficiency is modelled."
+        },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
+
+    "feedback": {
+      "enum": ["none", "potentiometer", "magnetic-encoder", "optical-encoder", "hall"],
+      "description": "'none' is a real answer and a consequential one: an open-loop actuator cannot confirm it reached a commanded pose, so anything derived about where the mechanism actually is becomes an assumption."
+    },
+
+    "electrical": {
+      "type": "object",
+      "properties": {
+        "nominal_volts": { "type": "number", "exclusiveMinimum": 0 },
+        "stall_current_a": { "type": "number", "exclusiveMinimum": 0, "description": "Sizing a supply from no-load current is how a mechanism browns out the moment it takes a load." },
+        "no_load_current_a": { "type": "number", "minimum": 0 },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
+
+    "mass_g": { "type": "number", "exclusiveMinimum": 0, "description": "An actuator mounted partway along a chain is itself a load on every joint below it." },
+    "source": { "$ref": "#/$defs/source" },
+    "note": { "type": "string" }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["citation"],
+      "properties": {
+        "citation": { "type": "string", "minLength": 1 },
+        "url": { "type": "string" },
+        "retrieved": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,9 @@
+# Robots you own are user state, not repo content — the same split
+# OpenBuildCore applies to inventory.json and machines.json (its ADR-0001).
+# data/robots/ holds shareable designs; these hold yours.
+/owned-robots.json
+/owned-robots.*.json
+
+__pycache__/
+*.py[cod]
+.venv/

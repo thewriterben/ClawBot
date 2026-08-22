@@ -1,0 +1,84 @@
+{
+  "_comment": [
+    "A SHAPE, not a robot. Every dimension here is a 1 and every citation is TODO(source),",
+    "following the placeholder discipline OpenBuildCore used for the K2 Plus envelope (its ADR-0005):",
+    "a placeholder blocks until a real source turns up, rather than letting a number recalled from",
+    "memory look like a measurement. Copy this, replace every 1 and every TODO(source), and delete",
+    "this comment. If you leave a placeholder in, downstream answers are supposed to fail loudly.",
+    "Note what you cannot fill in even if you want to: there is no reach field (ADR-0003) and no",
+    "payload field (ADR-0004)."
+  ],
+
+  "schema_version": 0,
+  "robot_id": "template-pan-tilt",
+  "kind": "pan-tilt",
+  "base_link": "base",
+
+  "links": [
+    {
+      "link_id": "base",
+      "make": {
+        "size_mm": { "x": 1, "y": 1, "z": 1 },
+        "material": "petg"
+      },
+      "source": { "citation": "TODO(source)" }
+    },
+    {
+      "link_id": "yoke",
+      "part_id": "mechanical/TODO",
+      "note": "A part_id is stored, never resolved here. Whoever needs its mass reads OpenPartsCore (ADR-0006).",
+      "source": { "citation": "TODO(source)" }
+    },
+    {
+      "link_id": "head",
+      "provenance_ref": {
+        "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "schema": "odc/provenance/0.2"
+      },
+      "note": "The strongest of the three link kinds: an OpenDesignCore artifact whose bbox and volume are facts rather than intent.",
+      "source": { "citation": "TODO(source)" }
+    }
+  ],
+
+  "joints": [
+    {
+      "joint_id": "pan",
+      "type": "revolute",
+      "parent": "base",
+      "child": "yoke",
+      "origin": {
+        "xyz_mm": { "x": 0, "y": 0, "z": 1 },
+        "rpy_rad": { "r": 0, "p": 0, "y": 0 }
+      },
+      "axis": { "x": 0, "y": 0, "z": 1 },
+      "limits": {
+        "lower_rad": -1,
+        "upper_rad": 1,
+        "source": { "citation": "TODO(source)" }
+      },
+      "actuator_id": "template-servo",
+      "gear_ratio": 1,
+      "source": { "citation": "TODO(source)" }
+    },
+    {
+      "joint_id": "tilt",
+      "type": "revolute",
+      "parent": "yoke",
+      "child": "head",
+      "origin": {
+        "xyz_mm": { "x": 0, "y": 0, "z": 1 }
+      },
+      "axis": { "x": 0, "y": 1, "z": 0 },
+      "limits": null,
+      "note": "limits: null is UNKNOWN, never unlimited. A reachability computation over this model answers 'incomplete' and names this joint (ADR-0003) rather than assuming full travel and claiming points the mechanism cannot reach.",
+      "actuator_id": "template-servo",
+      "source": { "citation": "TODO(source)" }
+    }
+  ],
+
+  "tool": null,
+  "measured_payload": null,
+
+  "source": { "citation": "TODO(source)" },
+  "note": "A vendor's published reach figure would go here, as prose, if it were worth recording at all."
+}

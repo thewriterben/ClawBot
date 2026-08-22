@@ -1,0 +1,39 @@
+{
+  "_comment": [
+    "A SHAPE, not an actuator. Placeholders throughout — see robot.template.json.",
+    "The field worth staring at is continuous_torque_nm: it is null here, and it will be null",
+    "for most real hobby servos too, because datasheets publish stall torque instead. Null is the",
+    "honest answer and it makes capacity underivable. Do not fill it in with a fraction of stall",
+    "torque; how_determined exists to reject that (ADR-0004)."
+  ],
+
+  "schema_version": 0,
+  "actuator_id": "template-servo",
+  "type": "hobby-servo",
+
+  "stall_torque_nm": {
+    "value": 1,
+    "at_volts": 1,
+    "source": { "citation": "TODO(source)" }
+  },
+
+  "continuous_torque_nm": null,
+
+  "no_load_speed_rad_s": null,
+
+  "travel": {
+    "lower_rad": -1,
+    "upper_rad": 1
+  },
+
+  "gearbox": {
+    "type": "spur",
+    "ratio": 1,
+    "source": { "citation": "TODO(source)" }
+  },
+
+  "feedback": "potentiometer",
+
+  "source": { "citation": "TODO(source)" },
+  "note": "backlash_rad is absent rather than 0. Absent means UNKNOWN; writing 0 because nobody measured it is the invented-data failure in miniature."
+}

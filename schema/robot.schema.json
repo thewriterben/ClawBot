@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clawbot/robot.schema.json",
+  "title": "Robot",
+  "description": "A mechanism: a tree of rigid links connected by joints, driven by actuators. Structurally URDF rather than a Denavit-Hartenberg table, because DH has two incompatible conventions in common use and four columns do not record which one they are (ADR-0005). Note what is absent: there is no reach field (ADR-0003) and no payload field (ADR-0004). Both are derived, per-pose, and carry the assumptions that make them true.",
+  "type": "object",
+  "required": ["schema_version", "robot_id", "kind", "base_link", "links", "joints", "source"],
+  "properties": {
+    "schema_version": { "const": 0 },
+    "robot_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "make": { "type": "string", "minLength": 1, "description": "Manufacturer, for a commercial mechanism. Absent for an original design." },
+    "model": { "type": "string", "minLength": 1 },
+    "kind": {
+      "enum": ["arm", "gantry", "scara", "gripper", "pan-tilt", "positioner"],
+      "description": "Open serial chains only. Delta arms, four-bar linkages and differentials are closed chains that the tree in ADR-0005 cannot express, so they are absent rather than approximated."
+    },
+    "base_link": {
+      "type": "string",
+      "description": "link_id of the root. The frame every transform in this record is ultimately relative to. Assumed fixed to the world; a mobile base is out of scope (ROADMAP, Not yet)."
+    },
+    "links": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/link" }
+    },
+    "joints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/joint" },
+      "description": "May be empty only for a single-link record. Each joint names a parent and child link_id; the graph must be a tree rooted at base_link, which a validator checks — the schema cannot."
+    },
+    "tool": {
+      "type": ["object", "null"],
+      "description": "The end effector and, more importantly, its offset. A reachability answer is meaningless without the tool offset it assumed, so the verdict carries it (ADR-0003). Null means no tool, which is a declaration, not an omission.",
+      "required": ["offset"],
+      "properties": {
+        "tool_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "attached_to": { "type": "string", "description": "link_id of the flange this tool bolts to. Defaults to the leaf link." },
+        "offset": { "$ref": "#/$defs/transform" },
+        "mass_g": { "type": "number", "minimum": 0, "description": "A tool's own mass consumes payload capacity before any workpiece does." },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
+    "measured_payload": {
+      "type": ["array", "null"],
+      "description": "Only ever figures somebody measured, each naming the pose it was measured at. There is deliberately no scalar payload field: rated capacity falls with extension because load torque is force times moment arm, so one number is true at one configuration and silently wrong everywhere else (ADR-0004). Absent means capacity is derived from continuous actuator torque, or not answered at all.",
+      "items": {
+        "type": "object",
+        "required": ["mass_g", "pose_rad", "how_measured"],
+        "properties": {
+          "mass_g": { "type": "number", "exclusiveMinimum": 0 },
+          "pose_rad": {
+            "type": "object",
+            "description": "joint_id -> joint value at which the measurement was taken. Radians for revolute joints, millimetres for prismatic ones (the field name follows the dominant case; a validator checks per joint type).",
+            "additionalProperties": { "type": "number" }
+          },
+          "how_measured": { "type": "string", "minLength": 1, "description": "What was lifted, held for how long, judged by what. A figure with no method behind it is indistinguishable from a recalled one." },
+          "measured_on": { "type": "string", "description": "ISO date." },
+          "sustained": { "type": "boolean", "description": "Whether the load was held long enough for the actuators to reach thermal steady state. A mass lifted once is not a mass the mechanism can hold." }
+        },
+        "additionalProperties": false
+      }
+    },
+    "source": { "$ref": "#/$defs/source" },
+    "note": {
+      "type": "string",
+      "description": "Prose. A vendor's published reach figure belongs here if it is worth recording at all — as prose a human reads, never as a field a consumer could mistake for a derived answer (ADR-0003)."
+    }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "link": {
+      "type": "object",
+      "description": "A rigid body. Exactly one of part_id, make or provenance_ref, mirroring OpenBuildCore's three requirement kinds so the vocabularies do not diverge (ADR-0006).",
+      "required": ["link_id"],
+      "properties": {
+        "link_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "part_id": {
+          "type": "string",
+          "description": "A part from OpenPartsCore. Stored, not resolved: a consumer needing its mass reads the registry. ClawBot imports nothing (ADR-0006)."
+        },
+        "make": {
+          "type": "object",
+          "description": "Something fabricated rather than bought. Fields match OpenBuildCore's make requirement (its ADR-0006) so a robot's bill of made parts can be handed to its machine check without translation. This is declared design intent, not a measurement.",
+          "required": ["size_mm", "material"],
+          "properties": {
+            "size_mm": {
+              "type": "object",
+              "required": ["x", "y", "z"],
+              "properties": {
+                "x": { "type": "number", "exclusiveMinimum": 0 },
+                "y": { "type": "number", "exclusiveMinimum": 0 },
+                "z": { "type": "number", "exclusiveMinimum": 0 }
+              },
+              "additionalProperties": false
+            },
+            "material": { "type": "string", "minLength": 1, "description": "Lowercase token, e.g. pla, petg, asa, alu-6061. Required: a made part with no material cannot be checked against a machine at all, and defaulting would invent a design decision on the author's behalf." },
+            "min_feature_mm": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "provenance_ref": {
+          "type": "object",
+          "description": "An OpenDesignCore artifact. The strongest of the three kinds: the geometry exists, so bbox and volume are facts rather than intent. Same distinction OBC drew between a project's declared size and can-print --from-sidecar.",
+          "required": ["artifact_sha256"],
+          "properties": {
+            "artifact_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "schema": { "type": "string", "description": "e.g. odc/provenance/0.2 — recorded so a record too old to carry bbox_mm is refused with its schema named rather than silently falling back." }
+          },
+          "additionalProperties": false
+        },
+        "mass_g": { "type": "number", "minimum": 0, "description": "Only for a link whose mass is not obtainable from its part_id or provenance record. Needed for a static payload derivation; absent means that derivation reports incomplete rather than assuming zero." },
+        "source": { "$ref": "#/$defs/source" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "joint": {
+      "type": "object",
+      "required": ["joint_id", "type", "parent", "child", "origin", "source"],
+      "properties": {
+        "joint_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "type": {
+          "enum": ["revolute", "continuous", "prismatic", "fixed"],
+          "description": "URDF's vocabulary. revolute has limits; continuous rotates without them; prismatic slides; fixed is a rigid attachment that exists to carry a transform."
+        },
+        "parent": { "type": "string", "description": "link_id, nearer the base." },
+        "child": { "type": "string", "description": "link_id, further from the base." },
+        "origin": { "$ref": "#/$defs/transform" },
+        "axis": {
+          "type": "object",
+          "description": "Axis of rotation or translation in the child frame. Required for every type but fixed; a validator enforces that, and also that it is not the zero vector.",
+          "required": ["x", "y", "z"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "z": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        "limits": {
+          "type": ["object", "null"],
+          "description": "Absent or null means UNKNOWN, never unlimited. A reachability computation over a joint with no limits answers 'incomplete' and names this joint (ADR-0003), because assuming full travel claims points the mechanism cannot reach.",
+          "properties": {
+            "lower_rad": { "type": "number", "minimum": -12.57, "maximum": 12.57, "description": "Revolute joints. Bounded at +/- 4*pi deliberately: radians are hostile to hand-authoring and a typed 90 in a _rad field is a plausible mistake, so the range check is the main defence ADR-0005 leaves standing." },
+            "upper_rad": { "type": "number", "minimum": -12.57, "maximum": 12.57 },
+            "lower_mm": { "type": "number", "description": "Prismatic joints." },
+            "upper_mm": { "type": "number" },
+            "effort_nm": { "type": "number", "exclusiveMinimum": 0, "description": "Maximum torque the joint may be commanded to produce. Distinct from the actuator's continuous torque: this is a limit imposed on the mechanism, that one is what the motor can sustain. A capacity derivation takes the lesser." },
+            "velocity_rad_s": { "type": "number", "exclusiveMinimum": 0 },
+            "source": { "$ref": "#/$defs/source" }
+          },
+          "additionalProperties": false
+        },
+        "actuator_id": { "type": "string", "description": "The actuator driving this joint, from data/actuators/. Absent for a fixed joint, and for a joint moved by hand." },
+        "gear_ratio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Reduction between actuator output and joint motion, as a multiplier on torque. Efficiency is NOT modelled, so a derived capacity using this is an upper bound and must be labelled one (ADR-0004)."
+        },
+        "source": { "$ref": "#/$defs/source" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "transform": {
+      "type": "object",
+      "description": "A pose relative to the parent frame. Translation in millimetres, rotation as roll/pitch/yaw in radians (ADR-0005). Both default to zero when absent, which is the one safe default here: an omitted transform means the frames coincide, which is a statement, not a guess.",
+      "properties": {
+        "xyz_mm": {
+          "type": "object",
+          "required": ["x", "y", "z"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "z": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        "rpy_rad": {
+          "type": "object",
+          "required": ["r", "p", "y"],
+          "properties": {
+            "r": { "type": "number", "minimum": -6.29, "maximum": 6.29 },
+            "p": { "type": "number", "minimum": -6.29, "maximum": 6.29 },
+            "y": { "type": "number", "minimum": -6.29, "maximum": 6.29 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "source": {
+      "type": "object",
+      "description": "Where the claim came from. Required on the robot and on every joint, because a joint limit is a physical claim about hardware and the platform gates those on citations. TODO(source) is an acceptable citation string and is expected to fail loudly downstream until replaced — that is what a placeholder is for.",
+      "required": ["citation"],
+      "properties": {
+        "citation": { "type": "string", "minLength": 1 },
+        "url": { "type": "string" },
+        "retrieved": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
