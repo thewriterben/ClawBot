@@ -62,7 +62,7 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 [`Knowledge/`](Knowledge/) is an LLM-maintained wiki. Its schema is [`Knowledge/CLAUDE.md`](Knowledge/CLAUDE.md) and it governs everything under that directory. Two rules matter most from outside it:
 
 - **Wiki pages are never evidence.** A number entering a schema, a data file or a computation cites a raw source, never a wiki page.
-- **The robotics pages were empty on purpose, and the rule that emptied them still stands.** Six sources were ingested on 2026-08-22 and seven of eight topics are answered; the last is gearbox efficiency, and it stays open because it would license a *number* rather than a *decision*. Filling a page from recall would manufacture the exact uncited content the invariant refuses. `Knowledge/concepts/open-questions.md` is the reading list.
+- **The robotics pages were empty on purpose, and the rule that emptied them still stands.** Six sources were ingested on 2026-08-22 and **all eight topics are answered** — gearbox efficiency last, and it closed by establishing that the number it would have licensed does not apply to the computation it was wanted for (ADR-0018). A seventh source on 2026-08-23 upgraded the one claim those eight left under-sourced; see [[backlash-measurement]]. Filling a page from recall would still manufacture the exact uncited content the invariant refuses, and that rule did not stop applying when the reading list emptied. `Knowledge/concepts/open-questions.md` records what closed and how.
 
 ## Status
 

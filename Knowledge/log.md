@@ -832,3 +832,38 @@ repo red with no commit here. It did not — `policy_categories` is optional, so
 valid document stayed valid — but the coupling is real and now demonstrated. It is the price of
 the two seam tests validating against a peer's *own* schema file rather than a copy, and the copy
 would have been worse: it would have gone stale silently instead of failing loudly.
+
+## [2026-08-23] ingest | Backlash: the under-sourced half of the last sourcing topic
+
+Sources: Nabtesco Motion Control, "Does Zero Backlash in Gearboxes exist?"; Nabtesco FAQ glossary,
+"Backlash"; ANSI/AGMA 2002-D19 listing (title only — paywalled, not read). → [[backlash-measurement]]
+
+**Why this ingest happened at all.** The reading list was empty and nothing was asking for work.
+But [[gearbox-efficiency]] had closed with one claim explicitly marked *"secondary sourcing, and
+flagged as such"*, and `backlash_rad`'s schema description carried the same flag in capitals. A
+claim that is recorded as under-sourced is not finished; it is *honest*, which is different. The
+flag was doing its job by still being there to notice.
+
+**What came back.** A vendor describing its own definition against the field's: *"many gearbox
+manufacturers choose to use the standard definition of backlash ... Nabtesco's definition includes
+not only the mechanical gap between parts, but also ... angular displacement that occurs due to
+loading."* That is the disagreement in writing, from a party to it, which is a better class of
+evidence than a trade article reporting that it exists. The same vendor publishes 0.1–0.3 arc·min
+and 0.3–0.6 arc·min for one shaft, differing only by which definition applies.
+
+**And a correction to the shape of the original claim.** "Backlash has no measurement standard"
+was too strong: ANSI/AGMA 2002-D19 is titled *"Tooth Thickness and Backlash Measurement of
+Cylindrical Involute Gearing"*. It appears to address backlash as gear-mesh geometry rather than an
+assembled reducer's output figure — but the scope is paywalled and **was not read**, so the page
+says "appears to answer a different question" and refuses to say "no standard covers assembled
+reducers". Half the original claim survives as primary; the other half is now known to have been
+imprecise.
+
+**Still open, and recorded as unknown rather than absent:** whether Harmonic Drive defines lost
+motion at a different percentage than Nabtesco's 3%. Its FR engineering data is already in this
+repo's citation chain and would be the natural second vendor, but the PDF resisted text extraction
+with the tooling to hand. One look by a human with the file open would settle it.
+
+**No ADR.** Nothing was decided that ADR-0018 and ADR-0021 had not already decided. A note's
+evidence standing improved, and the schema description now says primary where it said SECONDARY.
+Changing a description is not changing a rule, and the rule — absent means UNKNOWN — is untouched.
