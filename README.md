@@ -23,7 +23,15 @@ Three of the Rust tests are `compile_fail` doctests, which is the only way to as
 
 ## Where it sits
 
-Fifth peer in the platform (OpenDesignCore ADR-0007):
+Fifth peer in the platform — by the shape of the argument in [ADR-0001](DECISIONS.md), not by
+anyone's blessing. This line used to cite OpenDesignCore ADR-0007, which enumerates the platform's
+peers and **does not name this repo**; a citation pointing at a document that does not say the
+thing being cited is the precise failure this platform's discipline exists to prevent, and it sat
+in the README of the repo that keeps saying so. Reported as
+[OpenDesignCore#15](https://github.com/thewriterben/OpenDesignCore/issues/15) and corrected here
+rather than left pending their answer.
+
+The peers, whatever the count turns out to be:
 
 | | |
 |---|---|
