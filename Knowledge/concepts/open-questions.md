@@ -181,6 +181,14 @@ Two of the eight closed as **refusals** — self-collision needs geometry this r
 and a running efficiency does not describe a stationary geartrain. A topic answered by
 establishing that the thing cannot or should not be done is a topic answered.
 
+**One of the eight left a claim it could not source, and that claim was closed on 2026-08-23.** The
+gearbox page recorded "backlash has no measurement standard" as trade-press hearsay and said so in
+capitals in the schema. A vendor's own pages supplied the core of it primarily -- see
+[[backlash-measurement]] -- and a standard with backlash in its title turned out to measure a
+different quantity. The reading list did not reopen: nothing new was asked, an existing answer got
+a better source. **That is the ordinary shape of wiki maintenance and is worth naming, because a
+reading list that only ever empties is a reading list nobody is checking.**
+
 **The reading list is empty. That is not the same as the wiki being finished** — it means every
 question written down at the start has a source behind its answer. New questions will arrive from
 data, the way ADR-0014 and ADR-0018 both did: not from thinking harder, but from one datasheet

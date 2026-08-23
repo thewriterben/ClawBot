@@ -45,7 +45,7 @@ Knowledge/
 
 ## The empty half — filled 2026-08-22, and the rule that emptied it still applies
 
-**This section used to say `raw/robotics/` was empty and that every domain page depending on it was unwritten.** That was true for one day. Six sources were ingested on 2026-08-22 and seven of the eight sourcing topics are answered; only gearbox efficiency and backlash remains. The history is kept here rather than deleted, because the *reason* the directory was empty is the part that has to survive:
+**This section used to say `raw/robotics/` was empty and that every domain page depending on it was unwritten.** That was true for one day. Six sources were ingested on 2026-08-22 and all eight sourcing topics are answered; gearbox efficiency and backlash was the last, and a seventh source on 2026-08-23 closed the one claim it had to leave secondary ([[backlash-measurement]]). The history is kept here rather than deleted, because the *reason* the directory was empty is the part that has to survive:
 
 An assistant asked about forward kinematics or servo thermal limits will produce fluent, mostly-correct, entirely uncited prose. Filing that into a wiki whose whole purpose is provenance would poison it at the root — and worse, it would look exactly like a page that had been researched. **The pages get written when sources arrive, and not before.** That rule did not stop applying when the first sources turned up; it is what every future page is still held to.
 

@@ -5,7 +5,7 @@ Catalogue of every page in this wiki. Read this first when answering a question,
 ## Concepts
 - [[ecosystem-position]] — the five peers, the seam they meet at, and the six boundaries ClawBot must not cross (2026-08-22)
 - [[inherited-invariants]] — the nine rules ClawBot did not invent and may not quietly drop, each traced to where it came from (2026-08-22)
-- [[open-questions]] — decisions made without evidence, and the reading list. Three questions closed and seven of eight sourcing topics answered (2026-08-22)
+- [[open-questions]] — decisions made without evidence, and the reading list. Three questions closed and all eight sourcing topics answered; the list emptied 2026-08-22 and one of its answers gained a better source 2026-08-23
 - [[urdf-round-trip]] — what reading the URDF spec cost ADR-0005: structure maps both ways, absence maps neither (2026-08-22)
 
 ## Entities
@@ -36,6 +36,7 @@ All eight repos read during the platform survey now have entity pages. The debt 
 - [[forward-kinematics]] — Lynch and Park; the product of exponentials, and why a third representation ADR-0005 never considered does not reopen it (2026-08-22)
 - [[workspace-and-collision]] — sampling is inner-bounded and under-claims, which is the direction this repo may be wrong in; self-collision stays refused and can now say why (2026-08-22)
 - [[gearbox-efficiency]] — efficiency is a five-variable curve, not a scalar; it does not apply to a static hold at all; and a vendor states its published stiffness varies ±30% unit to unit (2026-08-22)
+- [[backlash-measurement]] — a vendor writes that its definition of backlash differs from the common one, which makes the incomparability primary rather than hearsay; and the standard named after backlash measures a gear mesh, not an assembled reducer (2026-08-23)
 
 ## The empty half, revisited
 

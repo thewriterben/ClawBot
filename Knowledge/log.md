@@ -832,3 +832,66 @@ repo red with no commit here. It did not — `policy_categories` is optional, so
 valid document stayed valid — but the coupling is real and now demonstrated. It is the price of
 the two seam tests validating against a peer's *own* schema file rather than a copy, and the copy
 would have been worse: it would have gone stale silently instead of failing loudly.
+
+## [2026-08-23] ingest | Backlash: the under-sourced half of the last sourcing topic
+
+Sources: Nabtesco Motion Control, "Does Zero Backlash in Gearboxes exist?"; Nabtesco FAQ glossary,
+"Backlash"; ANSI/AGMA 2002-D19 listing (title only — paywalled, not read). → [[backlash-measurement]]
+
+**Why this ingest happened at all.** The reading list was empty and nothing was asking for work.
+But [[gearbox-efficiency]] had closed with one claim explicitly marked *"secondary sourcing, and
+flagged as such"*, and `backlash_rad`'s schema description carried the same flag in capitals. A
+claim that is recorded as under-sourced is not finished; it is *honest*, which is different. The
+flag was doing its job by still being there to notice.
+
+**What came back.** A vendor describing its own definition against the field's: *"many gearbox
+manufacturers choose to use the standard definition of backlash ... Nabtesco's definition includes
+not only the mechanical gap between parts, but also ... angular displacement that occurs due to
+loading."* That is the disagreement in writing, from a party to it, which is a better class of
+evidence than a trade article reporting that it exists. The same vendor publishes 0.1–0.3 arc·min
+and 0.3–0.6 arc·min for one shaft, differing only by which definition applies.
+
+**And a correction to the shape of the original claim.** "Backlash has no measurement standard"
+was too strong: ANSI/AGMA 2002-D19 is titled *"Tooth Thickness and Backlash Measurement of
+Cylindrical Involute Gearing"*. It appears to address backlash as gear-mesh geometry rather than an
+assembled reducer's output figure — but the scope is paywalled and **was not read**, so the page
+says "appears to answer a different question" and refuses to say "no standard covers assembled
+reducers". Half the original claim survives as primary; the other half is now known to have been
+imprecise.
+
+**Still open, and recorded as unknown rather than absent:** whether Harmonic Drive defines lost
+motion at a different percentage than Nabtesco's 3%. Its FR engineering data is already in this
+repo's citation chain and would be the natural second vendor, but the PDF resisted text extraction
+with the tooling to hand. One look by a human with the file open would settle it.
+
+**No ADR.** Nothing was decided that ADR-0018 and ADR-0021 had not already decided. A note's
+evidence standing improved, and the schema description now says primary where it said SECONDARY.
+Changing a description is not changing a rule, and the rule — absent means UNKNOWN — is untouched.
+
+## [2026-08-23] ingest | The second vendor was in the citation chain all along
+
+Source: Harmonic Drive LLC, FR engineering data (already cited by [[gearbox-efficiency]]).
+→ [[backlash-measurement]]
+
+The entry above closed the backlash claim as half-sourced and left one thing open: whether Harmonic
+Drive defines lost motion at a percentage other than Nabtesco's 3%. It was recorded as **unknown
+rather than absent**, because the PDF would not yield to any tool to hand.
+
+**It does not define lost motion at all.** Neither "lost motion" nor "hysteresis" occurs in the
+document. It defines backlash as *"pure play existing between the input and output"*, *"measured at
+output with input locked"* — which is exactly the definition Nabtesco named as the one "many gearbox
+manufacturers choose to use" and distinguished its own from. Both parties to the disagreement are
+now on the record, and one of them was already in this repo's bibliography.
+
+**The finding is better than the one being looked for.** The question assumed the two vendors
+measure the same quantity at different loads. They do not: Nabtesco reads one arc-minute figure at
+3% of rated torque, while Harmonic Drive publishes pure play with no torque named, plus a
+three-region spring rate for the low-torque behaviour. The quantities do not correspond and cannot
+be converted. "Not comparable without their methods" turns out to understate it.
+
+**Method, recorded because it constrains what may be quoted.** The PDF was read by decompressing its
+content streams with `zlib` and undoing a subset-font shift by hand — no PDF library was available.
+That recovers prose and **destroys numerals**: the ±30% spring-rate variation comes back as
+"approximately ___ of the average". So the page quotes prose only and takes **no number** from this
+reading. The decoder was validated first against a sentence already verified independently — the oil
+seals and churning-of-oil quote — and reproduced it exactly.

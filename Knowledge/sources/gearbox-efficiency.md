@@ -1,7 +1,7 @@
 ---
 title: Gearbox efficiency and backlash — a five-variable curve, and a figure that is not about your unit
 type: source-summary
-updated: 2026-08-22
+updated: 2026-08-23
 sources:
   - Harmonic Drive LLC, "FR Gearing — Precision Gearing and Motion Control", engineering data, 16 pp. (retrieved 2026-08-22, https://www.harmonicdrive.net/_hd/content/documents/fr.pdf)
   - Trade-press and vendor articles on planetary backlash measurement, via survey results (retrieved 2026-08-22, secondary — used only for the no-standard claim, and marked as such)
@@ -84,6 +84,13 @@ right, two vendors' backlash figures are not comparable without their methods, w
 
 **Recorded as believed and under-sourced.** It is consistent with everything primary in this
 page, and it is not strong enough to build a schema rule on by itself.
+
+**Followed up 2026-08-23, and half of it held.** The core — that two vendors' figures are not
+comparable without their methods — is now primary: a vendor states in its own words that its
+definition of backlash differs from the one many others use. The framing was too strong, though.
+A standard with backlash in its title does exist; it appears to measure a gear mesh rather than an
+assembled reducer, and its scope was paywalled and unread. The four-point averaging and the 2%
+figure remain unsourced. See [[backlash-measurement]].
 
 ## The consequence for this repo, and it is not the expected one
 
