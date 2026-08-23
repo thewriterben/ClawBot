@@ -670,3 +670,65 @@ second only to the `compile_fail` doctests.
 **Honest about the data.** `HARNESSES` is empty, because `data/harnesses/` is. The harness tests
 exercise the type API rather than real records, and say so, instead of a fixture pretending to be
 data. 147 Python tests, 33 Rust tests.
+
+---
+
+## [2026-08-22] lint | First lint pass, and two of the first three findings were bugs in the lint
+
+`CLAUDE.md` has described a Lint operation since the day this wiki was created — contradictions
+between pages, claims a newer source has superseded, orphan pages, concepts with no page, and
+`TODO(source)` markers waiting long enough to chase. It had never been run. Eleven log entries
+in one day is when a wiki starts contradicting itself, so: run.
+
+**Two of the first three findings were false positives, and they are findings about the
+instrument rather than the wiki.**
+
+A naive `[[target]]` scan flagged `[[links]]`, `[[page-name]]` and `[[wiki-link]]` as broken.
+All three are prose *about* the wiki-link syntax, already correctly inside code spans — in
+`CLAUDE.md`'s own grounding rule, among others. **A lint must strip fenced blocks and inline
+code before matching, or it reports the schema that defines the syntax as violating it.** With
+code spans excluded there are **zero** broken links.
+
+The orphan check flagged `raw/platform/llm-wiki.md`. That is a category error: raw sources are
+not wiki pages, they are cited **by path** and deliberately never by `[[link]]`, so every source
+in `raw/` is an orphan by construction and always will be. The orphan check applies to
+`entities/`, `concepts/` and `sources/` only. With `raw/` excluded there are **zero** orphans.
+
+Worth keeping both, because a future automated lint will make the same two mistakes.
+
+**Three real defects, all of the same species: a document describing its own state, outrun by
+the state.**
+
+1. `index.md` claimed **7** log entries. There were 11.
+2. `open-questions.md` claimed **three** `TODO(source)` markers, "all in [[clawbot]] and
+   [[ecosystem-position]]". There is one, in [[clawbot]]; the ecosystem-position markers were
+   removed during a rewrite and the count was not updated.
+3. The surviving marker's condition has been **met**, and the page did not say so.
+
+**That third one is the finding worth the whole pass.** The marker reads "Nobody has asked for
+ClawBot yet." Since it was written, `crates/obc-body` appeared in [[oh-ben-claw]] and consumes
+ClawBot's Rust binding to derive Track 0 limits from a cited body model. Literally, a peer now
+reads ClawBot data.
+
+The marker stays, and [[clawbot]] now explains why: that crate was written in the same session,
+by the same author, at the same person's direction, and is deliberately unwired — its own
+ROADMAP entry says the first condition to wire it is *not Oh-Ben-Claw's to meet*, because
+`data/robots/` here is empty. **Building your own consumer and then citing it as demand is
+circular**, and it is precisely the self-satisfying move a provenance wiki exists to catch.
+ADR-0001's admission is unchanged.
+
+Recorded as an amendment rather than a deletion, because the next reader will see a consumer
+exists and reasonably conclude the marker is stale. A marker that survives its own trigger
+condition needs to say why, or it will not survive the reader after next.
+
+**Checked and clean:** every page carries `title`, `type`, `updated` and `sources` frontmatter;
+no broken `[[links]]`; no orphans among the linkable pages; entity, concept and source counts in
+`index.md` match the filesystem. The hub check is unremarkable and slightly telling —
+[[opendesigncore]] is the most-linked page at 16 inbound, ahead of [[clawbot]] at 10, which is
+what a repo that inherited most of its discipline from a peer should look like.
+
+**Not checked, and honestly out of reach of a script:** contradictions between pages that are
+both internally consistent, and "concepts mentioned repeatedly but with no page of their own".
+The second needs a judgement about what deserves a page, and the frequency counts a script can
+produce are dominated by the vocabulary every page shares. Left for a human, and named here so
+the omission is visible rather than implied by a clean report.

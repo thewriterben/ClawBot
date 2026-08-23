@@ -202,4 +202,13 @@ would not have changed anything. See [[forward-kinematics]].
 
 ## Ingestion queue hygiene
 
-Per [`../CLAUDE.md`](../CLAUDE.md), a lint pass should check whether `TODO(source)` markers have been waiting long enough to chase. As of 2026-08-22 there are three, all in [[clawbot]] and [[ecosystem-position]], all recording the same thing: nobody has asked for this repo yet.
+Per [`../CLAUDE.md`](../CLAUDE.md), a lint pass should check whether `TODO(source)` markers have
+been waiting long enough to chase.
+
+**Lint run 2026-08-22.** There is **one**, in [[clawbot]]. This paragraph said three, in
+[[clawbot]] and [[ecosystem-position]] — the ecosystem-position markers were removed during a
+rewrite and the count was not updated, which is the ordinary way a self-describing document
+goes wrong.
+
+The surviving one is worth reading rather than chasing: its literal condition has been met and
+it still stands. See [[clawbot]] for why.

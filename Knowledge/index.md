@@ -57,7 +57,7 @@ came from a single datasheet meeting a single schema field, not from thinking ha
 
 ## Counts
 
-4 concepts, 8 entities, 10 source summaries, 7 log entries. One real record in `data/`, cited to a vendor manual. 1 raw source copied locally; the rest cited by
+4 concepts, 8 entities, 10 source summaries, 11 log entries. One real record in `data/`, cited to a vendor manual. 1 raw source copied locally; the rest cited by
 repo-relative path or by URL with a retrieval date.
 
 Evidence quality is not uniform and the pages say so individually. The URDF pages rest on a
