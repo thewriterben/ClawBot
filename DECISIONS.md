@@ -1273,3 +1273,46 @@ field now exists to prevent it.
 
 ADR-0019's decision is unchanged: absent still means undeclared, ClawBot still refuses to emit a
 fabrication-bound document for an undeclared record, and it still never infers a category.
+
+---
+
+## ADR-0023 — Torque carries the index its datasheet indexes it by, and for a stepper that is current
+
+**Date:** 2026-08-23
+**Status:** accepted
+
+**Context.** The `type` enum has accepted `stepper` and `bldc` since the schema was written. No field could express one.
+
+Every torque row required `at_volts`: `$defs/torqueAtVolts` requires it, and `continuous_torque_nm` requires it with `additionalProperties: false` and no `at_amps` anywhere. A stepper publishes **holding torque against rated current per phase**. So recording one honestly was impossible, and the only way through was to invent a voltage the datasheet does not state — which is the precise failure this repo exists to refuse, reached by following the schema rather than by carelessness.
+
+An enum that promises support the fields cannot deliver is worse than an enum that refuses the type outright, because it looks like a supported path right up until the moment somebody fills it in.
+
+**Why not just write the vendor's voltage in.** StepperOnline publishes, for the 17HS19-2004S1: holding torque 59 N·cm, rated current/phase 2.0 A, phase resistance 1.4 Ω, **voltage 2.8 V**.
+
+> 2.0 A × 1.4 Ω = 2.8 V, exactly.
+
+The published "voltage" is the I·R product of the two figures beside it. It carries no information they do not, it is not the supply the motor is driven from, and — since phase resistance moves with temperature — it is not even stable. A second retailer lists the same motor with **no voltage at all**, which is consistent with it not being an independent specification.
+
+Writing that number into `at_volts` would make one field name mean *"the supply voltage this figure applies at"* on a servo and *"rated current times winding resistance"* on a stepper. A consumer reading `at_volts` across a mixed registry would be silently comparing two different quantities. That is ADR-0014's problem — a figure whose index is not stated is not a figure — arriving from the other direction.
+
+**Options considered.**
+
+1. *Make `at_volts` optional on the existing rows.* Rejected. It would let a servo record omit the voltage that ADR-0014 exists to require, trading a stepper gap for a servo hole.
+2. *Accept either index on one row type (`anyOf`).* Rejected. A row that may be indexed either way must be inspected to know which it is, and the whole point of an index is that a lookup does not have to guess.
+3. *Store the vendor's I·R voltage and note the meaning in prose.* Rejected. A note does not travel into a derivation, and the number would be numerically indistinguishable from a real supply voltage.
+4. *A separate current-indexed field, with no voltage on it at all.* Accepted.
+
+**Decision.** `holding_torque_nm`, an array of `$defs/torqueAtAmps` = `{value, at_amps, source}`, `additionalProperties: false`.
+
+- `at_amps` is **required**, per phase, and is the index — the exact role `at_volts` plays for a servo.
+- **There is deliberately no `at_volts` on this type.** Re-admitting it reopens the ambiguity the field exists to close. A genuine supply voltage belongs in `electrical.nominal_volts`, where it describes the actuator rather than annotating a torque.
+- The validator refuses a holding row carrying `at_volts` and *says why*, because `scripts/` is stdlib-only and does not evaluate the schema's own `additionalProperties`.
+- Using the wrong field for the type is **reported, not refused**: both are legal shapes, and a vendor may yet publish something this ADR did not anticipate.
+
+**What this does not decide.** *Whether a holding torque may size a mechanism.* It may not, today — `continuous_torque_nm` remains the only torque that does (ADR-0004), and a stepper with only a holding figure answers `incomplete` exactly as the XM430 and the MG90S do.
+
+That is not a claim that holding torque is unsustainable. It is a record that **the datasheet read for this ADR does not say**, and the question is left open rather than settled by inference. The Rust binding enforces it the way it enforces the stall rule: `HoldingTorque` has no conversion to `ContinuousTorque`, and a `compile_fail` doctest executes that guarantee.
+
+**Consequences.** A stepper or BLDC can now be recorded without inventing anything. Six tests cover the index, the duplicate, the refused voltage, both wrong-field warnings, and the underivable-capacity outcome. The binding gains `HoldingTorque` and `Actuator::holding_torque`, empty for every servo — and empty is not zero.
+
+This is the third field to arrive this way, after ADR-0014 (voltage) and ADR-0018 (efficiency). All three came from one datasheet meeting one schema field, which is the mechanism `Knowledge/concepts/open-questions.md` predicted would keep producing them: *"not from thinking harder, but from one datasheet meeting one schema field."*

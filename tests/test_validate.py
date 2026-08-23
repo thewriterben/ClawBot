@@ -294,6 +294,62 @@ def test_stall_only_actuator_is_valid_and_warns():
     assert warns(report, "capacity is underivable")
 
 
+
+# ------------------------------------------------------- ADR-0023: current-indexed torque
+
+def test_holding_torque_without_current_is_refused():
+    """The stepper mirror of test_torque_without_voltage_is_refused. Current is
+    the index for a current-controlled actuator, so a row without one cannot be
+    looked up."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "stepper", "source": SRC,
+           "holding_torque_nm": [{"value": 0.59, "source": SRC}]}
+    assert refuses(run("actuator", doc), "without its current")
+
+
+def test_two_holding_rows_at_one_current_are_refused():
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "stepper", "source": SRC,
+           "holding_torque_nm": [{"value": 0.59, "at_amps": 2.0, "source": SRC},
+                                 {"value": 0.61, "at_amps": 2.0, "source": SRC}]}
+    assert refuses(run("actuator", doc), "two rows at 2.0 A")
+
+
+def test_a_holding_row_may_not_carry_a_voltage():
+    """ADR-0023's whole point. A stepper datasheet's 'rated voltage' is rated
+    current times phase resistance, so admitting at_volts here would let one
+    field name mean two different quantities across two actuator types."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "stepper", "source": SRC,
+           "holding_torque_nm": [{"value": 0.59, "at_amps": 2.0, "at_volts": 2.8,
+                                  "source": SRC}]}
+    assert refuses(run("actuator", doc), "at_volts")
+
+
+def test_a_stepper_using_the_servo_field_is_reported():
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "stepper", "source": SRC,
+           "stall_torque_nm": [{"value": 0.59, "at_volts": 2.8, "source": SRC}]}
+    report = run("actuator", doc)
+    assert report.failures == []          # a legal shape, just the wrong one
+    assert warns(report, "publishes HOLDING torque against current")
+
+
+def test_a_servo_using_the_stepper_field_is_reported():
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
+           "holding_torque_nm": [{"value": 0.18, "at_amps": 0.7, "source": SRC}]}
+    report = run("actuator", doc)
+    assert report.failures == []
+    assert warns(report, "publishes stall torque against voltage")
+
+
+def test_holding_torque_alone_leaves_capacity_underivable():
+    """The 17HS19-2004S1 case, and the same answer ADR-0004 gives for stall.
+    Whether a holding torque is sustainable is not something the datasheet says,
+    so it may not stand in for a continuous rating."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "stepper", "source": SRC,
+           "holding_torque_nm": [{"value": 0.59, "at_amps": 2.0, "source": SRC}],
+           "continuous_torque_nm": None}
+    report = run("actuator", doc)
+    assert report.failures == []
+    assert warns(report, "capacity is underivable")
+
 # ------------------------------------------------------------ ADR-0011: assemblies
 
 def test_assembly_dependency_cycle_is_refused():

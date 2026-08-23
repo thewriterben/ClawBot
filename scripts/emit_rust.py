@@ -167,6 +167,32 @@ pub struct StallTorque {
     pub at_amps: Option<f64>,
 }
 
+/// Torque a current-controlled actuator holds against, at a stated current per
+/// phase.
+///
+/// Indexed by **current, not voltage** (ADR-0023). A stepper datasheet's "rated
+/// voltage" is rated current times phase resistance — for the 17HS19-2004S1,
+/// 2.0 A x 1.4 ohm = 2.8 V exactly — so it carries no information the other two
+/// figures do not, and it is not the supply the motor runs on. This type has no
+/// `at_volts` field for that reason.
+///
+/// **No conversion to [`ContinuousTorque`]**, for the same reason
+/// [`StallTorque`] has none: whether a holding torque is sustainable is not
+/// something the datasheet says, so turning one into a capacity figure would be
+/// a guess with a type signature.
+///
+/// ```compile_fail
+/// use clawbot::{HoldingTorque, ContinuousTorque};
+/// let holding = HoldingTorque { newton_metres: 0.59, at_amps: 2.0 };
+/// let _sized_on_this: ContinuousTorque = holding.into();
+/// ```
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct HoldingTorque {
+    pub newton_metres: f64,
+    /// Required, per phase. The index a row is looked up by.
+    pub at_amps: f64,
+}
+
 /// Torque an actuator can sustain. **The only torque that may size a mechanism**
 /// (ADR-0004).
 ///
@@ -415,6 +441,9 @@ pub struct Actuator {
     /// Frequently empty, including on good datasheets. Empty means capacity is
     /// not derivable (ADR-0004).
     pub continuous_torque: &'static [ContinuousTorque],
+    /// Current-indexed headline for steppers and BLDCs (ADR-0023). Empty for a
+    /// servo, and empty is not zero.
+    pub holding_torque: &'static [HoldingTorque],
     pub gear_ratio: Option<f64>,
     /// `None` means UNKNOWN, never zero. Backlash is why a commanded pose and an
     /// achieved pose differ.
@@ -734,6 +763,10 @@ def render_actuator(act: dict) -> str:
         f"at_volts: {float(r['at_volts'])!r}_f64, "
         f"how_determined: {rs_str(r['how_determined'])} }},\n"
         for r in act.get("continuous_torque_nm") or [])
+    holding = "".join(
+        f"            HoldingTorque {{ newton_metres: {float(r['value'])!r}_f64, "
+        f"at_amps: {float(r['at_amps'])!r}_f64 }},\n"
+        for r in act.get("holding_torque_nm") or [])
     gearbox = act.get("gearbox") or {}
     backlash = gearbox.get("backlash_rad")
     return (
@@ -744,6 +777,7 @@ def render_actuator(act: dict) -> str:
         f"        kind: {rs_str(act['type'])},\n"
         f"        part_id: {rs(act.get('part_id'))},\n"
         f"        stall_torque: &[\n{stall}        ],\n"
+        f"        holding_torque: &[\n{holding}        ],\n"
         f"        continuous_torque: &[\n{cont}        ],\n"
         f"        gear_ratio: {rs_f64(gearbox.get('ratio'))},\n"
         f"        backlash_rad: "
