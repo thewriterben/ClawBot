@@ -2,7 +2,7 @@
 
 Describe a robot once — links, joints, actuators, and where every number came from. Then ask what it can actually reach, and what it can actually hold there.
 
-**Status:** pre-alpha. Four schemas, twenty-two ADRs, six scripts, an MCP surface, a zero-dependency Rust binding, **154 Python tests and 35 Rust tests**, all run by CI, and a knowledge base whose robotics half is no longer empty. `data/` holds one real record — a Dynamixel XM430-W350, written from the vendor's own manual, whose continuous torque is `null` because ROBOTIS names the stall/continuous distinction and then publishes only stall. No robot record yet: that needs a real mechanism in hand, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
+**Status:** pre-alpha. Four schemas, twenty-two ADRs, six scripts, an MCP surface, a zero-dependency Rust binding, **154 Python tests and 35 Rust tests**, all run by CI, and a knowledge base whose robotics half is no longer empty. `data/` holds two real records, and both have `continuous_torque_nm: null` for the same reason from opposite ends of the market. The Dynamixel XM430-W350 comes from a vendor that **names** the stall/continuous distinction and then publishes only stall. The TowerPro MG90S comes from one that does not name it at all — and whose two own documents disagree about the servo's body length by 7 mm, which is why no dimension from either appears in a link record. No robot record yet: that needs a real mechanism in hand, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
 
 ```
 python scripts/validate.py                     # uncited claims, degrees in _rad, non-trees

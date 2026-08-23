@@ -72,5 +72,5 @@ That is the same discipline as ClawBot's rule against writing a README claim the
 support, and the same honesty problem: a system that works in simulation and has never met
 hardware is a specific, nameable state, and naming it is cheaper than being found out.
 
-ClawBot is in an adjacent state and should say so as plainly: it has one real actuator record and
+ClawBot is in an adjacent state and should say so as plainly: it has two real actuator records and
 **no robot record**, because that needs a real mechanism with real datasheets.

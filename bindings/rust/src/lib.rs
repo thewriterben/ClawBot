@@ -579,6 +579,26 @@ pub const ACTUATORS: &[Actuator] = &[
         basis: None,
         spread_pct: None,
     },
+    Actuator {
+        id: "towerpro-mg90s",
+        make: Some("TowerPro"),
+        model: Some("MG90S"),
+        kind: "hobby-servo",
+        part_id: None,
+        stall_torque: &[
+            StallTorque { newton_metres: 0.1765197_f64, at_volts: 4.8_f64, at_amps: None },
+            StallTorque { newton_metres: 0.2157463_f64, at_volts: 6.0_f64, at_amps: None },
+        ],
+        continuous_torque: &[
+        ],
+        gear_ratio: None,
+        backlash_rad: None,
+        mass_g: Some(13.4_f64),
+        starting_torque_nm: None,
+        backdriving_torque_nm: None,
+        basis: None,
+        spread_pct: None,
+    },
 ];
 
 /// Every harness record, sorted by id. This is the control contract
