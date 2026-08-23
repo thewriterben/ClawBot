@@ -1,0 +1,110 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # ubuntu-latest, unlike OpenDesignCore's Windows-pinned job. Nothing here
+    # has a native dependency: `scripts/` is stdlib Python and the binding is a
+    # zero-dependency Rust crate.
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checked out into a named directory rather than the workspace root,
+      # because the seam tests locate OpenBuildCore as a SIBLING of this repo
+      # (tests/test_manifest.py resolves `parents[2] / "OpenBuildCore"`). A
+      # bare checkout would put this repo at the root and the sibling path
+      # would land outside the workspace.
+      - uses: actions/checkout@v7
+        with:
+          path: ClawBot
+
+      # The two cross-repo tests validate emitted output against OpenBuildCore's
+      # OWN schema file rather than a copy of it (ADR-0006: the peers meet at
+      # data). They are written to skip honestly when that repo is absent — so
+      # without this checkout the build would be green having proved nothing
+      # about the seam it exists to prove.
+      - uses: actions/checkout@v7
+        with:
+          repository: thewriterben/OpenBuildCore
+          path: OpenBuildCore
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # `scripts/` takes no dependencies and must stay that way — the runtime
+      # deps here are the test harness and the MCP SDK, nothing the validator
+      # or the emitters import.
+      - name: Install test dependencies
+        working-directory: ClawBot
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest jsonschema
+          pip install -r clawbot_mcp/requirements.txt
+
+      # OpenDesignCore's citations job has the rule this borrows: fail rather
+      # than pass a check that checked nothing. Both of these guard a test file
+      # that SKIPS when its dependency is missing, and a skipped test reads as
+      # green while proving nothing.
+      - name: The tests that can skip must not skip here
+        working-directory: ClawBot
+        run: |
+          set -euo pipefail
+          test -f ../OpenBuildCore/schema/project.schema.json || {
+            echo "OpenBuildCore is not checked out beside this repo, so the two"
+            echo "seam tests in tests/test_manifest.py would skip. A skipped seam"
+            echo "test proves nothing while reading as green."
+            exit 1
+          }
+          python -c 'import mcp' || {
+            echo "The MCP SDK is not installed, so every test in tests/test_mcp.py"
+            echo "would skip — including the two guards on ADR-0016 that matter"
+            echo "most: no tool takes a filesystem path, and no tool strips its"
+            echo "caveats."
+            exit 1
+          }
+
+      # Every record in data/ against every rule with teeth. Empty is a valid
+      # state here and reported as one — data/robots/ has no entries because a
+      # robot record needs a real mechanism with real datasheets.
+      - name: Validate records
+        working-directory: ClawBot
+        run: python scripts/validate.py
+
+      # OpenPartsCore ADR-0003's discipline: the generated binding is committed
+      # and this regenerates it and diffs. A data change without a regenerated
+      # binding fails here rather than drifting — which is the entire reason
+      # the platform generates bindings, since three hand-maintained copies of
+      # a registry drifting apart is the documented failure OpenPartsCore was
+      # created to end.
+      - name: The committed Rust binding is not stale
+        working-directory: ClawBot
+        run: python scripts/emit_rust.py --check
+
+      - name: Python tests
+        working-directory: ClawBot
+        # -rs lists what skipped. The guard above should make that list empty;
+        # printing it means a future skip is visible in the log rather than
+        # hidden inside a green tick.
+        run: python -m pytest tests/ -q -rs
+
+      # Three of these are `compile_fail` doctests, which is the only way to
+      # assert a guarantee that lives in the type system: passing Degrees where
+      # Radians is required must not compile, and neither must converting a
+      # StallTorque into a ContinuousTorque (ADR-0017).
+      - name: Rust binding tests
+        working-directory: ClawBot/bindings/rust
+        run: cargo test
+
+      - name: Rust binding builds without warnings
+        working-directory: ClawBot/bindings/rust
+        env:
+          RUSTFLAGS: "-D warnings"
+        run: cargo build

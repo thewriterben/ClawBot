@@ -17,44 +17,39 @@
     },
 
     "stall_torque_nm": {
-      "type": ["object", "null"],
-      "description": "The datasheet headline. Recorded because datasheets publish it and omitting the field invites someone to write it into continuous_torque_nm, NOT because it is usable. A validator must refuse to let this value reach a capacity derivation (ADR-0004).",
-      "required": ["value", "at_volts"],
-      "properties": {
-        "value": { "type": "number", "exclusiveMinimum": 0 },
-        "at_volts": { "type": "number", "exclusiveMinimum": 0, "description": "Required. A torque figure without its supply voltage is not a figure - the same servo quoted at 6.0 V and 7.4 V differs substantially." },
-        "source": { "$ref": "#/$defs/source" }
-      },
-      "additionalProperties": false
+      "type": ["array", "null"],
+      "description": "The datasheet headline, as a CURVE SAMPLED AT VOLTAGES rather than one figure (ADR-0014). Recorded because datasheets publish it and omitting the field invites someone to write it into continuous_torque_nm, NOT because it is usable. A validator must refuse to let these values reach a capacity derivation (ADR-0004).",
+      "items": { "$ref": "#/$defs/torqueAtVolts" },
+      "minItems": 1
     },
 
     "continuous_torque_nm": {
-      "type": ["object", "null"],
-      "description": "The only torque that may feed a capacity derivation. Absent means capacity cannot be derived and the answer is 'incomplete', naming this actuator - the same shape as OpenBuildCore answering 'requires slicing' for a machine with no measured throughput (its ADR-0005). Most hobby datasheets do not publish this, so absence will be the common case; that is a true statement about the available evidence, not a gap to be filled with a fraction of stall torque.",
-      "required": ["value", "at_volts", "how_determined"],
-      "properties": {
-        "value": { "type": "number", "exclusiveMinimum": 0 },
-        "at_volts": { "type": "number", "exclusiveMinimum": 0 },
-        "how_determined": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Datasheet continuous rating, or a measurement and its method. A rule of thumb applied to stall torque is not a determination and must be rejected here - it is a guess wearing a citation."
+      "type": ["array", "null"],
+      "description": "The only torque that may feed a capacity derivation, and an array for the reason ADR-0014 gives: torque against voltage is a curve, and this actuator's own rated range can span 26%. Null means capacity cannot be derived and the answer is 'incomplete', naming this actuator - the same shape as OpenBuildCore answering 'requires slicing' for a machine with no measured throughput (its ADR-0005). Most hobby datasheets do not publish this, so null will be the common case; that is a true statement about the available evidence, not a gap to be filled with a fraction of stall torque.",
+      "items": {
+        "type": "object",
+        "required": ["value", "at_volts", "how_determined"],
+        "properties": {
+          "value": { "type": "number", "exclusiveMinimum": 0 },
+          "at_volts": { "type": "number", "exclusiveMinimum": 0 },
+          "how_determined": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Datasheet continuous rating, or a measurement and its method. A rule of thumb applied to stall torque is not a determination and must be rejected here - it is a guess wearing a citation."
+          },
+          "thermal_basis": { "type": "string", "description": "Duty cycle, ambient, and whether steady state was reached. A torque held for ten seconds is not a continuous torque." },
+          "source": { "$ref": "#/$defs/source" }
         },
-        "thermal_basis": { "type": "string", "description": "Duty cycle, ambient, and whether steady state was reached. A torque held for ten seconds is not a continuous torque." },
-        "source": { "$ref": "#/$defs/source" }
+        "additionalProperties": false
       },
-      "additionalProperties": false
+      "minItems": 1
     },
 
     "no_load_speed_rad_s": {
-      "type": ["object", "null"],
-      "required": ["value", "at_volts"],
-      "properties": {
-        "value": { "type": "number", "exclusiveMinimum": 0 },
-        "at_volts": { "type": "number", "exclusiveMinimum": 0 },
-        "source": { "$ref": "#/$defs/source" }
-      },
-      "additionalProperties": false
+      "type": ["array", "null"],
+      "description": "Also voltage-indexed (ADR-0014): the same datasheet that publishes three torque rows publishes three speed rows, from the same table.",
+      "items": { "$ref": "#/$defs/torqueAtVolts" },
+      "minItems": 1
     },
 
     "travel": {
@@ -75,13 +70,31 @@
       "properties": {
         "ratio": { "type": "number", "exclusiveMinimum": 0 },
         "type": { "enum": ["spur", "planetary", "harmonic", "cycloidal", "worm", "belt", "none"] },
-        "backlash_rad": { "type": "number", "minimum": 0, "description": "Absent means UNKNOWN, never zero. Backlash is why a commanded pose and an achieved pose differ, and recording it as zero because nobody measured it is the invented-data failure in miniature." },
-        "efficiency": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "maximum": 1,
-          "description": "NOT used in any derivation at this stage - ADR-0004 draws the line at a static upper bound and says so in every answer. Recorded when a datasheet states it, so that the figure is already here when efficiency is modelled."
+        "backlash_rad": { "type": "number", "minimum": 0, "description": "Absent means UNKNOWN, never zero. Backlash is why a commanded pose and an achieved pose differ, and recording it as zero because nobody measured it is the invented-data failure in miniature. NOTE: trade sources report there is no standard governing how backlash is measured - averaging methods and applied torques differ between vendors - which would make two vendors' figures incomparable without their methods. That claim is SECONDARY-SOURCED and no rule is built on it yet (ADR-0018)." },
+        "measured_efficiency": {
+          "type": ["array", "null"],
+          "description": "Replaces a scalar efficiency field, which was the third instance of this repo's recurring defect: a quantity varying over an operating envelope, stored as one number (ADR-0018). Harmonic Drive's own engineering data states efficiency 'varies depending on input speed, ratio, load level, temperature, and type of lubrication' and publishes eight curves and no scalar - and its worked example lands at 58% at rated load and 50% at 60% of rated, against the 80-90% the trade literature quotes. STILL FEEDS NO DERIVATION, and now for a sourced reason rather than an unmodelled one: efficiency curves describe a gearbox that is TURNING, indexed by input speed, while a static hold has an input speed of zero. Applying a running efficiency to a held pose is wrong in kind, not in value. A vendor curve may be sampled into this array; a single catalogue number may not, because there is no such thing.",
+          "items": {
+            "type": "object",
+            "required": ["value", "input_speed_rad_s", "output_torque_nm", "how_determined"],
+            "properties": {
+              "value": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+              "input_speed_rad_s": { "type": "number", "minimum": 0, "description": "The operating point this figure was read at. Required, because it is the primary index of every published efficiency curve." },
+              "output_torque_nm": { "type": "number", "exclusiveMinimum": 0, "description": "Efficiency falls with load below rated; a figure without its load is not a figure." },
+              "temperature_c": { "type": "number" },
+              "lubricant": { "type": "string", "description": "Named grease or oil, and quantity where the vendor conditions the curve on it. Harmonic Drive's curves are valid only for their own grease at standard quantity." },
+              "how_determined": { "type": "string", "minLength": 1, "description": "Read from which chart of which document, or measured how. Reading a value off a chart image is not a citation and should say so." },
+              "basis": { "$ref": "#/$defs/basis" },
+              "spread_pct": { "$ref": "#/$defs/spreadPct" },
+              "source": { "$ref": "#/$defs/source" }
+            },
+            "additionalProperties": false
+          }
         },
+        "starting_torque_nm": { "$ref": "#/$defs/torqueRange", "description": "Input torque required to begin motion. A RANGE, never a value (ADR-0021) - Harmonic Drive publishes 3-50 N.cm for one size, spanning better than an order of magnitude, and the variation is unit-to-unit rather than over an operating envelope. FEEDS NO DERIVATION." },
+        "backdriving_torque_nm": { "$ref": "#/$defs/torqueRange", "description": "Output torque required to turn the input - what a stationary geartrain resists. A RANGE, never a value (ADR-0021), and THE TWO ENDS ANSWER OPPOSITE QUESTIONS. 'Can this hold a load unpowered' is answered by the MINIMUM, because your unit might be the loose one. 'Will this back-drive when I need it to, for hand-guiding or a fault that must not lock the joint' is answered by the MAXIMUM, because your unit might be the stiff one. A single figure cannot serve both and picking an end silently is wrong in one direction depending on a question this record does not know the caller is asking. FEEDS NO DERIVATION: the tempting inference - that a load below the backdriving minimum is held with no actuator torque - is a physical claim this repo has no source for, and its failure mode is a joint that lets go." },
+        "basis": { "$ref": "#/$defs/basis" },
+        "spread_pct": { "$ref": "#/$defs/spreadPct" },
         "source": { "$ref": "#/$defs/source" }
       },
       "additionalProperties": false
@@ -110,6 +123,41 @@
   "additionalProperties": false,
 
   "$defs": {
+    "basis": {
+      "enum": ["model-typical", "this-unit"],
+      "description": "Whether this value describes the PRODUCT LINE or the object on your bench (ADR-0018). The distinction is not pedantry: Harmonic Drive states in a datasheet that its published torsional stiffness is 'the average of many tests of actual units' and that 'the spring rate of an individual unit may vary within approximately +/-30% of the average'. A cited value has meant 'somebody published it' everywhere in this platform so far; this is a vendor saying their number describes a population. ABSENT MEANS UNKNOWN, never 'assumed exact' - and a derivation must report the weakest basis it consumed, because a verdict built from population averages is a different claim from one built from measurements of the specific hardware."
+    },
+    "torqueRange": {
+      "type": ["object", "null"],
+      "description": "A quantity that varies UNIT TO UNIT rather than over an operating envelope, so it is stored as a range and never collapsed to a value (ADR-0021). There is deliberately no 'typical' field: it would be read as the answer, the range would become decoration, and a vendor-published midpoint does not exist - inventing one would be a number with no source sitting between two that have one.",
+      "required": ["min", "max", "how_determined"],
+      "properties": {
+        "min": { "type": "number", "exclusiveMinimum": 0 },
+        "max": { "type": "number", "exclusiveMinimum": 0 },
+        "how_determined": { "type": "string", "minLength": 1, "description": "The vendor's method where they state one - Harmonic Drive's reads 'based on actual tests with the component sets assembled in their housings, and inclusive of friction resistance of oil seals, and churning of oil', which is the reference example of the standard this repo asks for. ALSO RECORD THE ORIGINAL UNITS if a conversion happened: a figure published in N.cm converts to _nm on the way in, and a reader checking against the datasheet will be looking for N.cm." },
+        "basis": { "$ref": "#/$defs/basis" },
+        "spread_pct": { "$ref": "#/$defs/spreadPct" },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
+    "spreadPct": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Unit-to-unit variation the vendor states for a model-typical figure, as a percentage of the value. Only ever a figure somebody published; absent means the spread is UNKNOWN, not zero."
+    },
+    "torqueAtVolts": {
+      "type": "object",
+      "description": "One row of a published table. Voltage is not an annotation on the value - it is the index the value is looked up by, and a derivation that picks the wrong row is wrong by the width of the curve (ADR-0014).",
+      "required": ["value", "at_volts"],
+      "properties": {
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "at_volts": { "type": "number", "exclusiveMinimum": 0, "description": "Required. A torque or speed figure without its supply voltage is not a figure - the same servo quoted at 6.0 V and 7.4 V differs substantially, and the XM430 spans 26% across its own rated range." },
+        "at_amps": { "type": "number", "exclusiveMinimum": 0, "description": "Current drawn at this row, where the datasheet states it. Sizing a supply from no-load current is how a mechanism browns out the moment it takes a load." },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": false
+    },
     "source": {
       "type": "object",
       "required": ["citation"],

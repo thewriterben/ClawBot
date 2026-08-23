@@ -6,7 +6,15 @@
     "memory look like a measurement. Copy this, replace every 1 and every TODO(source), and delete",
     "this comment. If you leave a placeholder in, downstream answers are supposed to fail loudly.",
     "Note what you cannot fill in even if you want to: there is no reach field (ADR-0003) and no",
-    "payload field (ADR-0004)."
+    "payload field (ADR-0004).",
+    "",
+    "`policy` is PD-5 / ADR-0019 and is OPTIONAL. Absent means UNDECLARED, and ClawBot will not",
+    "turn that into 'none' for you. Leaving it out blocks exactly one thing: manifest.py",
+    "--as-project, because that document is bound for a network which reads an absent",
+    "declaration AS a 'none' declaration carrying fraud consequences. Every derivation still",
+    "runs regardless — computing kinematics is not fabricating. Categories are BINGO's ids,",
+    "stored verbatim and never checked against a copy kept here, because a forked taxonomy",
+    "drifts. If you have nothing to declare, declare [\"none\"] and say which list version."
   ],
 
   "schema_version": 0,
@@ -75,6 +83,12 @@
       "source": { "citation": "TODO(source)" }
     }
   ],
+
+  "policy": {
+    "categories": ["none"],
+    "taxonomy_version": "TODO(source)",
+    "declared_by": "TODO(source)"
+  },
 
   "tool": null,
   "measured_payload": null,

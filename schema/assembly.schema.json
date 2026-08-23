@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clawbot/assembly.schema.json",
+  "title": "Assembly",
+  "description": "How a robot goes together. The robot record says what a mechanism IS; this says what somebody has to do to end up holding one. Note what is absent, and why: there is no build_time field (ADR-0011), because an assembly time nobody timed is the same invented number OpenBuildCore removed from print time (its ADR-0005). Torque specs are physical claims about fasteners and are citation-gated like joint limits. Steps form a DAG rather than a list, because 'do these in any order' and 'do this one first' are different facts and a numbered list cannot tell them apart.",
+  "type": "object",
+  "required": ["schema_version", "assembly_id", "robot_id", "steps", "source"],
+  "properties": {
+    "schema_version": { "const": 0 },
+    "assembly_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "robot_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "The robot this assembly builds. Stored, not resolved — same rule as a part_id (ADR-0006). A validator run over both files checks that every link_id named in a step exists in that robot."
+    },
+
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" },
+      "description": "A directed acyclic graph, expressed by each step naming what it depends on. A cycle is a validation error. A step with no depends_on may be done first; two steps with the same dependencies may be done in either order, and saying so is information a numbered list destroys."
+    },
+
+    "measured_build_time": {
+      "type": ["object", "null"],
+      "description": "Only ever a figure somebody timed. Absent means build time cannot be estimated and the answer is that it requires building one — the same shape as OpenBuildCore's measured_throughput and refused for the same reason (ADR-0011). A sum of per-step guesses is not a measurement, it is a guess with more decimal places.",
+      "required": ["minutes", "how_measured"],
+      "properties": {
+        "minutes": { "type": "number", "exclusiveMinimum": 0 },
+        "how_measured": { "type": "string", "minLength": 1, "description": "Who built it, how many times, whether the parts were already printed and sorted, and whether this was their first attempt. A first build and a fifth build are different numbers and the difference is large." },
+        "builder_experience": { "enum": ["first-time", "repeat", "author"], "description": "The author of an assembly is the fastest possible builder and the least representative one." },
+        "measured_on": { "type": "string", "description": "ISO date." }
+      },
+      "additionalProperties": false
+    },
+
+    "source": { "$ref": "#/$defs/source" },
+    "note": { "type": "string" }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "step": {
+      "type": "object",
+      "required": ["step_id", "action"],
+      "properties": {
+        "step_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "action": { "type": "string", "minLength": 1, "description": "What a person does, in a sentence. Prose for a human; nothing computes against it." },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "step_ids that must be complete first. Absent or empty means this step has no predecessor — a genuine claim that it can be done first, not an omission."
+        },
+        "joins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "link_ids from the robot record that this step brings together. This is the field that ties an assembly to a mechanism rather than leaving it as a standalone document."
+        },
+        "fasteners": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fastener" }
+        },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "What the step needs in hand, as lowercase tokens: hex-2.5, torque-driver, loctite-243, press. A tool nobody owns is a blocker discovered at the bench, which is exactly the kind OpenBuildCore exists to move earlier."
+        },
+        "irreversible": {
+          "type": "boolean",
+          "description": "True for a step that cannot be undone without destroying a part — a press fit, a cut, a permanent adhesive, a heat-set insert. Declaring it is what lets a build guide warn BEFORE rather than after, and it is a fact about the step that no downstream tool can infer."
+        },
+        "verify": {
+          "type": "string",
+          "description": "How the builder confirms the step actually worked, before the next step buries it. A step whose failure is only discoverable three steps later is the expensive kind."
+        },
+        "source": { "$ref": "#/$defs/source" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "fastener": {
+      "type": "object",
+      "description": "Exactly one of part_id or spec. A fastener from OpenPartsCore's mechanical namespace is preferred, because then its facts have a home with citations; spec is the escape hatch for a size nobody has catalogued yet.",
+      "required": ["qty"],
+      "properties": {
+        "part_id": { "type": "string", "description": "An OpenPartsCore mechanical entry. Stored, not resolved (ADR-0006)." },
+        "spec": { "type": "string", "description": "e.g. 'M3x8 SHCS', 'M3 heat-set insert OD 4.6'. Prose, because a fastener nobody catalogued has no id to point at. A validator may warn that this should become a part_id." },
+        "qty": { "type": "integer", "minimum": 1 },
+        "torque_nm": {
+          "type": ["object", "null"],
+          "description": "A torque spec is a physical claim about hardware and is gated on a citation exactly like a joint limit. ABSENT MEANS UNKNOWN, never 'hand tight' and never 'snug' — the failure mode is a stripped insert in a printed part, which is unrecoverable and common. Most hobby assemblies will have null here, and that is a true statement about the available evidence rather than a gap to fill with a number from feel.",
+          "required": ["value", "source"],
+          "properties": {
+            "value": { "type": "number", "exclusiveMinimum": 0 },
+            "source": { "$ref": "#/$defs/source" },
+            "note": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "threadlock": { "type": "boolean", "description": "Whether the joint is specified to receive a threadlocking compound. A fastener in a mechanism that vibrates and has neither threadlock nor a locking feature is a fastener that will back out; recording its absence is more useful than leaving it unsaid." }
+      },
+      "additionalProperties": false
+    },
+
+    "source": {
+      "type": "object",
+      "required": ["citation"],
+      "properties": {
+        "citation": { "type": "string", "minLength": 1 },
+        "url": { "type": "string" },
+        "retrieved": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

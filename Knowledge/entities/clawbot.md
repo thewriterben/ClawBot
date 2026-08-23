@@ -36,4 +36,19 @@ Both are the same move [[openbuildcore]] made with print time: if nobody measure
 
 Fifth peer; see [[ecosystem-position]]. Imports nothing — the peers meet at data, not an API (ADR-0006).
 
-A likely consumer is [[oh-ben-claw]], which commands physical robots and currently has no shareable robot *model* to command them against. ADR-0001 records that as the reason ClawBot is not a crate inside it: a model inside the runtime is a model no other consumer can read without taking the runtime as a dependency. **TODO(source):** this is reasoning about Oh-Ben-Claw from its README, not a request from it. Nobody has asked for ClawBot yet, and ADR-0001 says so.
+A likely consumer is [[oh-ben-claw]], which commands physical robots and currently has no shareable robot *model* to command them against. ADR-0001 records that as the reason ClawBot is not a crate inside it: a model inside the runtime is a model no other consumer can read without taking the runtime as a dependency. **TODO(source):** this is reasoning about Oh-Ben-Claw from its README, not a request from it.
+Nobody has asked for ClawBot yet, and ADR-0001 says so.
+
+**Amended 2026-08-22 by a lint pass, and the amendment is the interesting part.** The literal
+condition is now met: `crates/obc-body` exists in [[oh-ben-claw]] and consumes ClawBot's Rust
+binding, deriving Track 0 safety limits from a cited body model. A peer reads ClawBot data.
+
+**The marker stays anyway.** That crate was written in the same session, by the same author, at
+the same person's direction, and it is deliberately unwired — its own ROADMAP entry says the
+first condition to wire it is not Oh-Ben-Claw's to meet, because `data/robots/` here is empty.
+Building your own consumer and then citing it as demand is circular, and it is exactly the
+self-satisfying move a provenance wiki exists to catch. ADR-0001's admission stands unchanged.
+
+What *would* discharge this marker: somebody who is not the author reading ClawBot data on
+purpose. Recorded this way rather than deleted, because the next reader will see a consumer
+exists and reasonably conclude the marker is stale.

@@ -1,0 +1,100 @@
+name: citations
+
+# Adopted from OpenDesignCore's workflow of the same name, and it matters more
+# here than almost anywhere: this repo's central invariant is that every number
+# describing hardware comes from a cited source or is absent. A citation whose
+# URL no longer resolves is a value that is no longer grounded, and the failure
+# is silent — the number stays in the file looking exactly as sourced as it did
+# the day it was written.
+#
+# Scope note, kept from upstream because it is the honest part: a resolving URL
+# proves the document is still reachable, NOT that it still says what the
+# citation claims. Only a human re-reading the source proves that. This catches
+# the cheap half, and the cheap half is the half that rots on its own.
+#
+# The wiki is checked as well as `data/`, for a reason specific to this repo:
+# `Knowledge/raw/robotics/` holds no copied sources. Every robotics source is
+# cited by URL with a retrieval date, precisely so a second copy could not drift
+# from its original — which means link rot is the whole exposure.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "data/**"
+      - "Knowledge/**"
+      - "**/*.md"
+      - ".github/workflows/citations.yml"
+  schedule:
+    # Weekly, Mondays 03:00 UTC. Datasheets rot slowly and vendors reorganise
+    # without warning; a push-only check would never notice.
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  citations:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build citation index from data/
+        run: |
+          set -euo pipefail
+          {
+            echo "# Generated citation index"
+            echo
+            echo "Written by .github/workflows/citations.yml. Not committed."
+            echo
+          } > .citations.md
+
+          # Any nested object carrying a "url" is a citation target — which in
+          # this schema means a source block, and they nest: an actuator's
+          # source, and separately the source on each voltage row of its torque
+          # curve (ADR-0014). Written as a markdown link whose *text* is the
+          # owning file, so a failure traces back to the record that owns it.
+          while IFS= read -r -d '' f; do
+            jq -r --arg f "$f" '
+              [.. | objects | select(has("url")) | .url]
+              | unique[]
+              | "- [\($f)](\(.))"
+            ' "$f" >> .citations.md
+          done < <(find data -name '*.json' -print0 | sort -z)
+
+          echo "--- .citations.md ---"
+          cat .citations.md
+
+          if ! grep -q '^- \[' .citations.md; then
+            echo "No citation URLs found under data/. Either the data store is"
+            echo "empty or the extraction broke — failing rather than passing a"
+            echo "check that checked nothing."
+            echo
+            echo "Note for whoever hits this first: data/ being EMPTY is a"
+            echo "legitimate state in this repo and always has been. If it is"
+            echo "empty on purpose, this step needs a deliberate exemption"
+            echo "rather than a silent pass."
+            exit 1
+          fi
+
+      - name: Check citation and documentation links
+        uses: lycheeverse/lychee-action@f796c8b7d468feb9b8c0a46da3fac0af6874d374 # v2.2.0
+        with:
+          fail: true
+          args: |
+            --no-progress
+            --verbose
+            --max-redirects 3
+            --accept '200..=299,403,429'
+            --timeout 30
+            --max-retries 3
+            --retry-wait-time 5
+            --exclude-path .git
+            --exclude-path bindings/rust/target
+            './.citations.md'
+            './*.md'
+            './Knowledge/**/*.md'
+            './data/**/*.md'
+            './clawbot_mcp/*.md'

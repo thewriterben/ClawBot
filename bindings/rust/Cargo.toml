@@ -1,0 +1,12 @@
+[package]
+name = "clawbot"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The ClawBot body model — links, joints, actuators — as const data. No dependencies."
+repository = "https://github.com/thewriterben/ClawBot"
+
+# Intentionally empty, matching OpenPartsCore. A consumer should not take a
+# dependency tree to read a static body model, and serde derives behind a
+# feature flag would start the conversation that zero-dep exists to end.
+[dependencies]

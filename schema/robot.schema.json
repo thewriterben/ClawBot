@@ -11,12 +11,12 @@
     "make": { "type": "string", "minLength": 1, "description": "Manufacturer, for a commercial mechanism. Absent for an original design." },
     "model": { "type": "string", "minLength": 1 },
     "kind": {
-      "enum": ["arm", "gantry", "scara", "gripper", "pan-tilt", "positioner"],
-      "description": "Open serial chains only. Delta arms, four-bar linkages and differentials are closed chains that the tree in ADR-0005 cannot express, so they are absent rather than approximated."
+      "enum": ["arm", "gantry", "scara", "gripper", "pan-tilt", "positioner", "mobile-manipulator"],
+      "description": "A LABEL for what sort of mechanism this is. It is not a topology constraint — that job belonged to this field until ADR-0008 found it contradicting the joints rule below, and now belongs solely to the tree check. Delta arms, four-bar linkages and Stewart platforms are true closed loops that the tree cannot express and are still absent rather than approximated; a joint COUPLED to another (a parallel jaw, a differential) is expressible as a mimic and is not a loop."
     },
     "base_link": {
       "type": "string",
-      "description": "link_id of the root. The frame every transform in this record is ultimately relative to. Assumed fixed to the world; a mobile base is out of scope (ROADMAP, Not yet)."
+      "description": "link_id of the root. The frame every transform in this record is ultimately relative to, and the frame every derived answer is relative to (ADR-0009). ClawBot does not model where this frame is in the world: a world pose comes from a localization stack, which is Oh-Ben-Claw's competence, and an answer claiming world coordinates would be asserting a pose with no source. A base that MOVES is expressible — give it a floating or planar joint — and reachability stays meaningful because it was never a world claim."
     },
     "links": {
       "type": "array",
@@ -60,6 +60,27 @@
         },
         "additionalProperties": false
       }
+    },
+    "policy": {
+      "type": ["object", "null"],
+      "description": "The author's declaration of policy categories under Project BINGO's shared taxonomy (platform decision PD-5, ClawBot ADR-0019). OPTIONAL, and absent means UNDECLARED — which ClawBot will not convert into 'none' on your behalf, because BINGO reads an absent declaration AS a 'none' declaration carrying fraud consequences. The consequence of leaving it absent is narrow and specific: manifest.py --as-project refuses to emit, because that document is bound for a network that requires a declaration. Every derivation - fk, reach, hold, can_it - runs regardless; computing kinematics is not fabricating, and a repo that refused to multiply matrices would be theatre. ClawBot NEVER INFERS a category from geometry, link lengths or a name; the declaration is the author's and only the author's.",
+      "required": ["categories", "taxonomy_version"],
+      "properties": {
+        "categories": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Category ids verbatim from BINGO's REFUSAL-CATEGORIES spec, e.g. 'none', 'regulated.medical', 'weapons.other'. Stored as strings and DELIBERATELY NOT validated against a hardcoded enum: that would fork a taxonomy whose own spec says growth requires a spec revision, and a forked registry that drifts is the failure OpenPartsCore exists to end. BINGO adjudicates; this repo carries the declaration faithfully."
+        },
+        "taxonomy_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "REQUIRED whenever categories are present. A category id without the version of the list it came from is a string whose meaning lives somewhere else - the same defect ADR-0005 rejects DH parameters for. BINGO freezes this file's hash into a job at order time; record whatever identifies the list you declared against."
+        },
+        "declared_by": { "type": "string", "description": "Who made this declaration. It is a claim a person makes, not a measurement, so it has an author rather than a method." },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
     },
     "source": { "$ref": "#/$defs/source" },
     "note": {
@@ -123,8 +144,8 @@
       "properties": {
         "joint_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
         "type": {
-          "enum": ["revolute", "continuous", "prismatic", "fixed"],
-          "description": "URDF's vocabulary. revolute has limits; continuous rotates without them; prismatic slides; fixed is a rigid attachment that exists to carry a transform."
+          "enum": ["revolute", "continuous", "prismatic", "fixed", "floating", "planar"],
+          "description": "URDF's vocabulary, all six of it. revolute has limits; continuous rotates without them; prismatic slides; fixed is a rigid attachment that exists to carry a transform; floating has six degrees of freedom; planar moves in a plane. The enum carried four until ADR-0009 — which meant 'structurally URDF' was already false by omission, before anyone asked for a mobile base. floating and planar say the base MOVES; they do not say how, and wheels, propellers, odometry and gait are not modelled here."
         },
         "parent": { "type": "string", "description": "link_id, nearer the base." },
         "child": { "type": "string", "description": "link_id, further from the base." },
@@ -142,7 +163,7 @@
         },
         "limits": {
           "type": ["object", "null"],
-          "description": "Absent or null means UNKNOWN, never unlimited. A reachability computation over a joint with no limits answers 'incomplete' and names this joint (ADR-0003), because assuming full travel claims points the mechanism cannot reach.",
+          "description": "Absent or null means UNKNOWN, never unlimited. A reachability computation over a joint with no limits answers 'incomplete' and names this joint (ADR-0003), because assuming full travel claims points the mechanism cannot reach. Note what this costs at the URDF boundary: urdfdom REFUSES to parse a revolute or prismatic joint with no limit element, so a record in exactly this honest state has no valid URDF representation and export must fail naming the joint rather than emit a zero (ADR-0007). A floating or planar joint has no meaningful limits and a validator must not demand them — its travel is bounded by an environment, and this repo does not model environments (ADR-0009).",
           "properties": {
             "lower_rad": { "type": "number", "minimum": -12.57, "maximum": 12.57, "description": "Revolute joints. Bounded at +/- 4*pi deliberately: radians are hostile to hand-authoring and a typed 90 in a _rad field is a plausible mistake, so the range check is the main defence ADR-0005 leaves standing." },
             "upper_rad": { "type": "number", "minimum": -12.57, "maximum": 12.57 },
@@ -160,6 +181,18 @@
           "exclusiveMinimum": 0,
           "description": "Reduction between actuator output and joint motion, as a multiplier on torque. Efficiency is NOT modelled, so a derived capacity using this is an upper bound and must be labelled one (ADR-0004)."
         },
+        "mimic": {
+          "type": ["object", "null"],
+          "description": "This joint's value is a fixed function of another joint's: multiplier * other + offset. URDF's element, adopted verbatim (ADR-0008). It is how a parallel jaw gripper, a differential wrist, or a linkage driven by one actuator is expressed WITHOUT a loop in the graph — the coupling is kinematic, the topology is still a tree. The consequence that matters: a mimicking joint is NOT independently commandable, so a reachability computation must not sample it as a free axis. That is the whole reason it lives in the model rather than in a note. A validator rejects a mimic cycle, a mimic naming a joint that does not exist, and a mimic on or naming a fixed joint.",
+          "required": ["joint"],
+          "properties": {
+            "joint": { "type": "string", "description": "joint_id this one follows." },
+            "multiplier": { "type": "number", "description": "Absent means 1, matching URDF's default. Unlike a limit, this default is safe: it is the identity, not a physical claim." },
+            "offset": { "type": "number", "description": "Absent means 0, matching URDF. Radians for revolute, millimetres for prismatic, per the driven joint's type." },
+            "source": { "$ref": "#/$defs/source" }
+          },
+          "additionalProperties": false
+        },
         "source": { "$ref": "#/$defs/source" },
         "note": { "type": "string" }
       },
@@ -168,7 +201,7 @@
 
     "transform": {
       "type": "object",
-      "description": "A pose relative to the parent frame. Translation in millimetres, rotation as roll/pitch/yaw in radians (ADR-0005). Both default to zero when absent, which is the one safe default here: an omitted transform means the frames coincide, which is a statement, not a guess.",
+      "description": "A pose relative to the parent frame. Translation in millimetres, rotation as roll/pitch/yaw in radians (ADR-0005). Both default to zero when absent, which is the one safe default here: an omitted transform means the frames coincide, which is a statement, not a guess. The rotation is FIXED-AXIS roll-pitch-yaw applied in X, Y, Z order, right-handed — REP-103's third-preference representation, and URDF's. Stating it matters for the same reason ADR-0005 refuses DH: REP-103 discourages Euler angles precisely because there are 24 conventions and the numbers do not record which one they are, and rpy is one letter away from being that mistake. Lengths convert to URDF's metres by a factor of 1000 at exactly one boundary (ADR-0007).",
       "properties": {
         "xyz_mm": {
           "type": "object",

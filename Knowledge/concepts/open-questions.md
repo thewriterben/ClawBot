@@ -10,7 +10,7 @@ sources:
 
 # Open questions
 
-Two lists. The first is what needs **falsifying** — decisions already recorded that were made without evidence. The second is what needs **reading** — the empty half of this wiki.
+Two lists. The first is what needs **falsifying** — decisions already recorded that were made without evidence. The second is what needed **reading**, and is now empty of sourcing topics.
 
 Ordered by how expensive the mistake gets if left alone.
 
@@ -18,63 +18,183 @@ Ordered by how expensive the mistake gets if left alone.
 
 ## Decisions made without evidence
 
-### 1. ADR-0005 chose URDF-over-DH without running a conversion
+### 1. ADR-0005 chose URDF-over-DH without running a conversion — **CLOSED 2026-08-22**
 
-The direct breach of [[inherited-invariants]] #8, the rule PD-1 paid for. The argument against DH is real — two incompatible conventions, four columns that do not record which — but "structurally URDF, so a converter is a mapping rather than a reinterpretation" is a **claim about a converter nobody has written**.
+Was the direct breach of [[inherited-invariants]] #8, the rule PD-1 paid for.
 
-**To falsify:** take a published URDF, map it to the schema in `schema/robot.schema.json`, map it back, and see what does not survive. Candidates for what breaks: `<mimic>` joints, multiple `<visual>`/`<collision>` geometries per link, xacro macros, inertial frames that are not the link frame. If a real URDF cannot round-trip, ADR-0005's consequences section is wrong and needs amending — the way [[opendesigncore]] amended ADR-0008 in place when the PicoGK Linux native turned out to be missing.
+**Falsified as predicted, and the prediction was too optimistic about what would break.** The
+guesses here were `mimic`, multiple visual/collision geometries, xacro and inertial frames — all
+real, all minor. The actual failure is **absence**: `urdfdom` refuses to parse a revolute joint
+with no `limit`, so ClawBot's honest "unknown travel" state has no URDF representation at all;
+and on import, missing bounds silently become `0` and a missing axis silently becomes `(1,0,0)`.
+The format destroys exactly the distinction this repo is built on.
 
-### 2. Nobody has asked for ClawBot
+Written up in [[urdf-round-trip]]; decided in ADR-0007, which retracts ADR-0005's consequences
+sentence and leaves its decision standing — now supported by three arguments from
+[[dh-conventions]] that ADR-0005 did not make.
 
-ADR-0001 admits the fifth repo is "justified by a data shape rather than by demand". [[ecosystem-position]] carries the same admission about the co-design gap.
+### 2. Nobody has asked for ClawBot — **half closed 2026-08-22**
 
-**To falsify:** read [[oh-ben-claw]]'s `docs/ECOSYSTEM-INTEGRATION.md` and `docs/EMBODIED-ARCHITECTURE.md` and find out whether it already has a robot model, in what form, and whether it is shareable. If it does and it is, ADR-0001's second rejection ("a crate inside Oh-Ben-Claw") was argued against a repo that had already solved it.
+ADR-0001 admits the fifth repo is "justified by a data shape rather than by demand".
 
-### 3. The actuator/parts boundary is untested
+**The factual half is settled: [[oh-ben-claw]] has no robot model.** `obc-movement` is two files
+exposing `ServoAngle { name, channel, angle }` — a flat name-and-channel-to-angle map with no
+representation that channel 3 is mechanically downstream of channel 1. `obc-navigation` is 2D
+mobile-base only. No link tree, no joint limit table, no kinematics. ADR-0001's second rejection
+was therefore argued against a repo that had *not* solved it, which is the answer that supports
+the decision. Recorded in ADR-0010, which also draws the line at which layer of control ClawBot
+stops.
 
-ClawBot's actuator schema carries make, model, mass and electrical fields that an [[openpartscore]] `mechanical` entry would plausibly also carry. The stated split — the registry holds *what the part is*, ClawBot holds *what it does in a mechanism* — is defensible and has never met a real entry.
+**Still open:** nobody has *asked*. A gap confirmed is not a request received, and the
+`TODO(source)` markers saying so stay until a peer reads ClawBot data on purpose.
 
-**To falsify:** write one actuator both ways and see which fields genuinely have two homes.
+**New, found in the same reading:** `MovementCommand::ServoAngle` is in **degrees** while ClawBot
+mandates radians. Two repos each correct in their own frame is how a mechanism gets commanded to
+57 times the intended angle. ADR-0010 puts the conversion at one boundary; nothing enforces it yet.
+
+### 3. The actuator/parts boundary is untested — **CLOSED 2026-08-22, and the split holds**
+
+The stated split — the registry holds *what the part is*, ClawBot holds *what it does in a
+mechanism* — was defensible and had never met a real entry.
+
+It has now. [[openpartscore]] already carries `electronic/sg90`, a hobby servo. What that record
+contains: id, name, description, source, and attributes `bus`, `capabilities`, `connector`,
+`compatible_boards`. What it does **not** contain: **no torque, no speed, no mass, no travel, no
+gearing, no feedback type.**
+
+So the overlap in practice is *zero*. OPC answers "what is this thing and how do you talk to
+it"; ClawBot answers "what does it do when you bolt it into a mechanism". The XM430 record
+written the same day carries torque at three voltages, gear ratio, travel and encoder type, and
+none of those fields has a home upstream.
+
+**Two smaller findings from the same comparison:**
+
+- A servo lives in OPC's **`electronic`** namespace, not `mechanical` — that is OPC ADR-0005
+  ("accessories are electronic parts"), and it means a ClawBot `part_id` for an actuator reads
+  `electronic/...`. Worth knowing before writing one.
+- `bus` appears on both sides — OPC's `attributes.bus` and ClawBot's `harness.channels.bus`.
+  Not yet a conflict, because they answer different questions (what the part speaks; what it is
+  wired to on this machine), but it is the one field to watch.
+
+**Still open, and now sharper:** OPC has no entry for the XM430 at all, so ClawBot's first
+record carries no `part_id`. Whether ClawBot records should *require* one, or whether an
+uncatalogued actuator is a legitimate state, is a real question the manifest emitter already
+half-answers by reporting uncatalogued parts separately rather than dropping them.
 
 ### 4. Radians in the file (ADR-0005) protects against one bug and invites another
 
 The `_rad` suffix plus a bounded range is the stated defence against a hand-typed `90`. Nothing has tested whether that defence holds for a value like `3` — plausibly 3 radians, plausibly a typo for 30 degrees, in range either way.
 
-### 5. PD-5 legality gating has no ClawBot position
+### 5. PD-5 legality gating has no ClawBot position — **unblocked, still undecided**
 
-A mechanism repo needs one more obviously than a parts registry does. Requires reading Project BINGO's acceptance schema, which owns the taxonomy.
+A mechanism repo needs one more obviously than a parts registry does.
+
+**The reading is done.** [[project-bingo]] owns the taxonomy in `v3/specs/REFUSAL-CATEGORIES.md`
+(v0.1, marked DRAFT). Legality gating is two-tier — design-time refusal at the assistants,
+fabrication-time refusal at the nodes — and the spec names design-time assistants explicitly:
+[[opendesigncore]], OpenCircuitCore and deployment tools. ClawBot is not named only because it
+did not exist when the spec was written.
+
+**Two of the nine categories land here.** `weapons.other` (items designed as weapons that are not
+firearms; default stance refuse network-wide) and `regulated.medical` (which explicitly includes
+**load-bearing prosthetics**; refuse unless a node opts in with declared certification context).
+A prosthetic limb is a mechanism, and it is the most likely thing anyone would describe with this
+schema that carries a category at all.
+
+**One mechanic cuts against this repo's grain and needs deciding on purpose.** In BINGO, an asset
+manifest with no `policy_categories` means `none` **as a declaration**, carrying the same fraud
+consequences as misdeclaring a licence. Everywhere in ClawBot, absent means *unknown*. Both are
+right in their own frame — a declaration is a claim somebody makes, an absent measurement is one
+nobody took — and a ClawBot position has to say which it is adopting and why.
+
+**Decided 2026-08-22 in ADR-0019**, and the middle question turned out to be the interesting one.
+
+- **Does the field exist?** Yes — `policy`, optional. The argument is mechanical rather than
+  moral: there is already a path from a robot record through `manifest.py` to OpenBuildCore to a
+  BINGO job, and BINGO reads an absent declaration as `none` *declared*. So an undeclared
+  manifest is not neutral; it makes that claim at the far end.
+- **Absent means unknown, or `none`?** Neither rule loses, because they govern **different kinds
+  of field**. This repo's absent-means-unknown covers *measurements* — nobody can declare a joint
+  limit, you measure it or you do not. A policy category is a *statement of intent*, and the
+  author always knows. So the field's nature is BINGO's; what ClawBot refuses is to **supply**
+  the declaration. Absent stays undeclared and is never converted at the boundary.
+- **Refuse to compute?** No. Forward kinematics is not fabrication and the mathematics is in every
+  textbook; a repo declining to multiply matrices would be theatre. The refusal is at the
+  **output boundary**, the same place ADR-0007 put the URDF refusal.
+
+**One consequence found while implementing it, worth reporting upstream:** OpenBuildCore's
+project schema is `additionalProperties: false` and has **no field for a policy declaration**, so
+the declaration cannot travel as data through `--as-project`. It goes as prose in `description`
+and is not machine-readable downstream. That is a gap in the seam, and the emitter says so rather
+than smuggling it.
 
 ---
 
 ## The reading list
 
-`raw/robotics/` is empty and so is every domain page. This is deliberate — see the "empty half" section of [`../CLAUDE.md`](../CLAUDE.md) — and this list is what fills it. **Nothing in the repo should be built on recall while this list is untouched.**
+`raw/robotics/` was empty and so was every domain page. Six sources were ingested on 2026-08-22 and **all eight sourcing topics are now closed**. The rule that emptied the directory has not stopped applying: nothing here is built on recall, and a new page still waits for a source.
 
-### Already on disk, not yet read
+### Read but not written up — **PAID 2026-08-22**
 
-Cheapest first; these need no sourcing, only time.
+OpenCircuitCore, ClawCam and Project BINGO were read during the opening platform survey and had
+no entity pages, while the index claimed they were unread. Both halves are fixed:
+[[opencircuitcore]], [[clawcam]] and [[project-bingo]] now exist.
+
+The debt is recorded rather than deleted because the failure is worth remembering: the wiki's own
+ingest rule says a source that touches pages updates them **in the same pass**, and this one did
+not, across two separate sessions. An ingest that stops at "I have read it" leaves the knowledge
+in commit messages, which is exactly where a wiki exists to stop it living.
+
+### Still on disk, not yet read
 
 - [[oh-ben-claw]] `docs/SOTA-COMPARISON.md` — a component-by-component benchmark against ROS 2 Nav2, slam_toolbox, Cartographer, AMCL, BehaviorTree.CPP and Open-RMF. The closest thing on disk to a robotics state-of-the-art survey.
-- [[oh-ben-claw]] `docs/EMBODIED-ARCHITECTURE.md`, `docs/ECOSYSTEM-INTEGRATION.md`, `Knowledge Base/` — see question 2 above.
+- [[oh-ben-claw]] `docs/EMBODIED-ARCHITECTURE.md`, `Knowledge Base/`.
 - Oh-Ben-Claw's README past the four-control-modes table (~770 lines unread), plus `registry/`.
-- **OpenCircuitCore** — the only peer with no entity page, because none of it has been read. An arm's wiring is a real constraint on its joint travel.
-- ClawCam — the perception peer; relevant if a mechanism ever needs to know where its target is.
-- Project BINGO — machine records, capability tiers, and the PD-5 taxonomy.
 
 ### Needs sourcing
 
 No page gets written from these headings until a citable source exists behind it.
+**Four of the original eight were ingested 2026-08-22** — see [`../raw/robotics/README.md`](../raw/robotics/README.md).
 
-| Topic | Why it matters | What would settle it |
+| Topic | Why it matters | Status |
 |---|---|---|
-| URDF specification | ADR-0005's entire basis | The official spec, not a tutorial |
-| DH conventions, standard vs Craig | The ambiguity ADR-0005 rejects DH for | A primary text stating both |
-| Forward kinematics | The computation ADR-0003 promises | A standard reference |
-| Workspace determination | Whether reach is sampled or solved — needs its own ADR | Literature on reachable-workspace computation |
-| Self-collision | Named in ADR-0003 as why computed reach is optimistic | Broad-phase/narrow-phase collision literature |
-| Servo thermal limits | ADR-0004's whole premise | A datasheet with a real continuous rating, plus anything on duty-cycle derating |
-| Gearbox efficiency and backlash | Turns an upper bound into an estimate | Vendor data with method |
-| Harmonic and cycloidal drives | Fields exist in the schema on the strength of the names alone | Anything primary |
+| ~~URDF specification~~ | ADR-0005's entire basis | **done** — XSD + `urdfdom` parser → [[urdf-spec]], ADR-0007 |
+| ~~DH conventions, standard vs Craig~~ | The ambiguity ADR-0005 rejects DH for | **done** — Corke 2007 → [[dh-conventions]] |
+| ~~Units and frames~~ | Not on the original list, and it should have been | **done** — REP-103 → [[rep-103-units]] |
+| ~~Servo thermal limits~~ | ADR-0004's whole premise | **done** — [[dynamixel-xm430]]: a good vendor names the stall/continuous distinction and publishes only stall. ADR-0004 confirmed on real evidence. |
+| ~~Forward kinematics~~ | The computation ADR-0003 promises | **done** — Lynch and Park → [[forward-kinematics]]. Turned up a third representation ADR-0005 never considered; see below. |
+| ~~Workspace determination~~ | Whether reach is sampled or solved — needed its own ADR | **done** — [[workspace-and-collision]] → ADR-0013. Sampled, because a sampled set is inner-bounded and under-claims. |
+| ~~Self-collision~~ | Named in ADR-0003 as why computed reach over-claims | **done** — [[workspace-and-collision]]. Outcome is a *refusal*: it needs link geometry this repo does not carry, plus an allowed-collision matrix nobody has authored. The caveat can now name why. |
+| ~~Gearbox efficiency and backlash~~ | Would turn an upper bound into an estimate | **done** — Harmonic Drive engineering data → [[gearbox-efficiency]], ADR-0018. It does **not** turn the bound into an estimate: efficiency curves are indexed by input speed and a static hold has none, so a running efficiency is the wrong quantity in kind. |
+
+**All eight answered, as of 2026-08-22.** The last one was held to the end because it was the
+only topic where a source would license a *number* rather than a *decision*, and it closed in the
+most useful way available: by establishing that the number does not apply to the computation it
+was wanted for.
+
+Two of the eight closed as **refusals** — self-collision needs geometry this repo does not carry,
+and a running efficiency does not describe a stationary geartrain. A topic answered by
+establishing that the thing cannot or should not be done is a topic answered.
+
+**The reading list is empty. That is not the same as the wiki being finished** — it means every
+question written down at the start has a source behind its answer. New questions will arrive from
+data, the way ADR-0014 and ADR-0018 both did: not from thinking harder, but from one datasheet
+meeting one schema field.
+
+### 6. Product of exponentials was never considered — **resolved, no change needed**
+
+Lynch and Park teach forward kinematics via the **product of exponentials** and relegate DH to an
+appendix. ADR-0005 framed its choice as DH versus a URDF tree; there was a third option on the
+table and nobody looked at it.
+
+It does not reopen the decision, for a reason worth keeping: **PoE is a computation, not a
+storage format.** A screw axis is derivable from what the tree already stores. And the two frames
+PoE requires are exactly the two this repo already insists on naming — a fixed base frame
+(ADR-0009) and an end-effector frame (ADR-0003's tool offset). DH loses both as factorisation
+residue. The representation ClawBot picked is on the right side of the distinction that matters.
+
+Recorded because "we did not consider X" is worth writing down even when the answer is that X
+would not have changed anything. See [[forward-kinematics]].
 
 **Note the shape of that table.** Eight rows, and the schema already has fields for most of them. Fields were written from an understanding that has no sources behind it yet — which is defensible for a *shape* and would not be defensible for a *value*. The distinction is doing real work here and is worth checking again once the reading is done.
 
@@ -82,4 +202,13 @@ No page gets written from these headings until a citable source exists behind it
 
 ## Ingestion queue hygiene
 
-Per [`../CLAUDE.md`](../CLAUDE.md), a lint pass should check whether `TODO(source)` markers have been waiting long enough to chase. As of 2026-08-22 there are three, all in [[clawbot]] and [[ecosystem-position]], all recording the same thing: nobody has asked for this repo yet.
+Per [`../CLAUDE.md`](../CLAUDE.md), a lint pass should check whether `TODO(source)` markers have
+been waiting long enough to chase.
+
+**Lint run 2026-08-22.** There is **one**, in [[clawbot]]. This paragraph said three, in
+[[clawbot]] and [[ecosystem-position]] — the ecosystem-position markers were removed during a
+rewrite and the count was not updated, which is the ordinary way a self-describing document
+goes wrong.
+
+The surviving one is worth reading rather than chasing: its literal condition has been met and
+it still stands. See [[clawbot]] for why.
