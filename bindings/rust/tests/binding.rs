@@ -196,7 +196,11 @@ fn the_xm430_is_present_and_says_capacity_is_underivable() {
     );
     assert_eq!(xm.gear_ratio, Some(353.5));
     assert_eq!(xm.backlash_rad, None, "absent means UNKNOWN, never zero");
-    assert_eq!(xm.part_id, None, "OpenPartsCore has no entry for it");
+    // Was `None, "OpenPartsCore has no entry for it"` until 2026-08-23. An entry
+    // was contributed upstream and merged, so the id now resolves — and it is
+    // STORED, never looked up: a consumer wanting the upstream facts reads the
+    // registry itself (ADR-0006).
+    assert_eq!(xm.part_id, Some("electronic/dynamixel-xm430-w350"));
 
     let twelve = xm
         .stall_torque
