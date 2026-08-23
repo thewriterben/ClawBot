@@ -554,6 +554,65 @@ pub fn harness_for(robot_id: &str) -> Option<&'static Harness> {
 
 /// Every robot record, sorted by id.
 pub const ROBOTS: &[Robot] = &[
+    Robot {
+        id: "pan-tilt-mg90s",
+        kind: "pan-tilt",
+        make: None,
+        model: None,
+        base_link: "base",
+        links: &[
+        Link {
+            id: "base",
+            part_id: None,
+            provenance_sha256: None,
+            make_size_mm: Some(Vec3 { x: 1.0_f64, y: 1.0_f64, z: 1.0_f64 }),
+            make_material: Some("petg"),
+            mass_g: None,
+        },
+        Link {
+            id: "yoke",
+            part_id: None,
+            provenance_sha256: None,
+            make_size_mm: Some(Vec3 { x: 1.0_f64, y: 1.0_f64, z: 1.0_f64 }),
+            make_material: Some("petg"),
+            mass_g: None,
+        },
+        Link {
+            id: "head",
+            part_id: None,
+            provenance_sha256: None,
+            make_size_mm: Some(Vec3 { x: 1.0_f64, y: 1.0_f64, z: 1.0_f64 }),
+            make_material: Some("petg"),
+            mass_g: None,
+        },
+        ],
+        joints: &[
+        Joint {
+            id: "pan",
+            kind: JointType::Revolute,
+            parent: "base",
+            child: "yoke",
+            origin: Transform { xyz_mm: Vec3 { x: 0.0_f64, y: 0.0_f64, z: 1.0_f64 }, rpy_rad: Vec3 { x: 0.0_f64, y: 0.0_f64, z: 0.0_f64 } },
+            axis: Some(Vec3 { x: 0.0_f64, y: 0.0_f64, z: 1.0_f64 }),
+            limits: None,
+            mimic: None,
+            actuator_id: Some("towerpro-mg90s"),
+            gear_ratio: Some(1.0_f64),
+        },
+        Joint {
+            id: "tilt",
+            kind: JointType::Revolute,
+            parent: "yoke",
+            child: "head",
+            origin: Transform { xyz_mm: Vec3 { x: 0.0_f64, y: 0.0_f64, z: 1.0_f64 }, rpy_rad: Vec3 { x: 0.0_f64, y: 0.0_f64, z: 0.0_f64 } },
+            axis: Some(Vec3 { x: 0.0_f64, y: 1.0_f64, z: 0.0_f64 }),
+            limits: None,
+            mimic: None,
+            actuator_id: Some("towerpro-mg90s"),
+            gear_ratio: Some(1.0_f64),
+        },
+        ],
+    },
 ];
 
 /// Every actuator record, sorted by id.
