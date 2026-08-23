@@ -21,7 +21,7 @@ jobs:
       # (tests/test_manifest.py resolves `parents[2] / "OpenBuildCore"`). A
       # bare checkout would put this repo at the root and the sibling path
       # would land outside the workspace.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: ClawBot
 
@@ -30,12 +30,12 @@ jobs:
       # data). They are written to skip honestly when that repo is absent — so
       # without this checkout the build would be green having proved nothing
       # about the seam it exists to prove.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: thewriterben/OpenBuildCore
           path: OpenBuildCore
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
