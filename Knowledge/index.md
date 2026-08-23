@@ -36,6 +36,7 @@ All eight repos read during the platform survey now have entity pages. The debt 
 - [[forward-kinematics]] — Lynch and Park; the product of exponentials, and why a third representation ADR-0005 never considered does not reopen it (2026-08-22)
 - [[workspace-and-collision]] — sampling is inner-bounded and under-claims, which is the direction this repo may be wrong in; self-collision stays refused and can now say why (2026-08-22)
 - [[gearbox-efficiency]] — efficiency is a five-variable curve, not a scalar; it does not apply to a static hold at all; and a vendor states its published stiffness varies ±30% unit to unit (2026-08-22)
+- [[stepper-torque-index]] — a stepper's published "rated voltage" is its rated current times its phase resistance, so voltage is the wrong index for its torque; the schema accepted the type long before any field could express it (2026-08-23)
 - [[backlash-measurement]] — a vendor writes that its definition of backlash differs from the common one, which makes the incomparability primary rather than hearsay; and the standard named after backlash measures a gear mesh, not an assembled reducer (2026-08-23)
 
 ## The empty half, revisited

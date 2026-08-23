@@ -895,3 +895,39 @@ That recovers prose and **destroys numerals**: the ±30% spring-rate variation c
 "approximately ___ of the average". So the page quotes prose only and takes **no number** from this
 reading. The decoder was validated first against a sentence already verified independently — the oil
 seals and churning-of-oil quote — and reproduced it exactly.
+
+## [2026-08-23] ingest | The enum promised a type the fields could not express
+
+Source: STEPPERONLINE and DHM Online listings for the 17HS19-2004S1.
+→ [[stepper-torque-index]], ADR-0023
+
+**Where the question came from.** Not from the reading list, which is empty, and not from thinking
+about the schema. It came from a build: a pan-tilt was being specified, the parts on the bench
+included steppers as well as servos, and checking whether the schema could hold one turned up that
+it could not. `type` has accepted `stepper` and `bldc` since the schema was written, while every
+torque row required `at_volts`.
+
+**The arithmetic that settled it.** STEPPERONLINE publishes holding torque 59 Ncm, rated current
+2.0 A, phase resistance 1.4 Ω, and voltage 2.8 V. The last is the product of the middle two,
+exactly. A second listing omits voltage altogether. So the "rated voltage" is not a measurement
+condition, it is a derived number — and writing it into `at_volts` would make one field name mean
+two different quantities depending on which actuator you were reading.
+
+**Why this shape keeps recurring.** Third time: ADR-0014 came from a voltage, ADR-0018 from an
+efficiency, ADR-0023 from a current. Each was one datasheet meeting one schema field, which is
+exactly what [[open-questions]] said would keep happening once the reading list emptied — *"not
+from thinking harder, but from one datasheet meeting one schema field."* The prediction is holding
+up well enough to be worth trusting: **the next schema gap will most likely arrive the same way,
+from the next real part, rather than from review.**
+
+**Recorded as not-stated rather than decided:** whether a holding torque is sustainable. Neither
+listing gives a continuous or thermal rating, so a stepper gets `continuous_torque_nm: null` and
+underivable capacity, the same as the XM430 and the MG90S. Steppers are commonly run at rated
+current continuously and nothing here contradicts that — there is simply no source for it, and the
+refusal is about the evidence, not the physics.
+
+**A tooling note worth keeping.** The manufacturer's PDF datasheet could not be read at all: it is
+published as a vectorised drawing with zero text operators, so the `zlib` stream extraction that
+worked on the Harmonic Drive document returned nothing. The figures came from product listings
+instead. That is the second PDF this month to resist reading for a different reason, and the page
+says which of its numbers came from where.

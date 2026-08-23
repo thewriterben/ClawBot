@@ -341,6 +341,54 @@ def check_actuator(path: Path, report: Report) -> str | None:
             else:
                 seen_volts.add(volts)
 
+    # Current-indexed rows (ADR-0023). Same rule, different index: a stepper's
+    # torque is set by current per phase, and its datasheet's "rated voltage" is
+    # just current times phase resistance.
+    holding = act.get("holding_torque_nm")
+    if holding is not None:
+        if not isinstance(holding, list):
+            report.fail(where, "holding_torque_nm is not an array (ADR-0023)")
+            holding = []
+        seen_amps = set()
+        for row in holding:
+            # The schema says additionalProperties: false, but this validator is
+            # hand-rolled and stdlib-only, so the rule is stated here where the
+            # failure can explain itself.
+            if "at_volts" in row:
+                report.fail(where, "holding_torque_nm row carries at_volts. A stepper "
+                                   "datasheet's 'rated voltage' is rated current times "
+                                   "phase resistance - for the 17HS19-2004S1, 2.0 A x "
+                                   "1.4 ohm = 2.8 V - so it is not the supply the motor "
+                                   "runs on, and admitting it here would let at_volts "
+                                   "mean two different quantities in one schema. A real "
+                                   "supply voltage belongs in electrical (ADR-0023)")
+            amps = row.get("at_amps")
+            if amps is None:
+                report.fail(where, "holding_torque_nm row has no at_amps; a holding "
+                                   "torque without its current is not a figure (ADR-0023)")
+            elif amps in seen_amps:
+                report.fail(where, f"holding_torque_nm has two rows at {amps} A — the "
+                                   f"current is the index a lookup uses")
+            else:
+                seen_amps.add(amps)
+    holding = holding or []
+
+    # The two headline fields are indexed differently because the actuators are
+    # driven differently. Using the wrong one is not a schema error -- both are
+    # legal shapes -- so it is reported rather than refused.
+    kind = act.get("type")
+    if kind in ("stepper", "bldc") and act.get("stall_torque_nm"):
+        report.warn(where, f"type '{kind}' with stall_torque_nm: a current-controlled "
+                           f"actuator publishes HOLDING torque against current, not "
+                           f"stall against voltage. See holding_torque_nm (ADR-0023)")
+    if kind in ("hobby-servo", "smart-servo") and holding:
+        report.warn(where, f"type '{kind}' with holding_torque_nm: a voltage-driven "
+                           f"servo publishes stall torque against voltage. See "
+                           f"stall_torque_nm (ADR-0014, ADR-0023)")
+    if holding and not act.get("continuous_torque_nm"):
+        report.warn(where, "holding torque only, continuous is null: capacity is "
+                           "underivable and that is the honest answer (ADR-0004)")
+
     # Guarded: a non-list here was already reported above, and iterating a dict
     # would yield its keys and crash on the next .get().
     cont = act.get("continuous_torque_nm")
