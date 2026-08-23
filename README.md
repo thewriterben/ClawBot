@@ -17,6 +17,11 @@ python -m pytest tests/ -q                     # 147 tests
 cd bindings/rust && cargo test                 # 33 more, 3 of them compile_fail
 ```
 
+CI runs all of it on every push, and refuses to start if the two peers those tests depend on are
+missing — a skipped seam test proves nothing while reading as green. A second workflow checks
+citation links weekly, because every robotics source here is cited by URL rather than copied
+into the repo, which makes link rot the whole exposure.
+
 The tests are the interesting part. 31 are negative — every rule with teeth, proven to bite. 26 are known answers rather than pinned outputs: a 1 kg mass on a 100 mm arm loads the joint with 0.980665 N⋅m whether or not this code has ever run. 19 run the URDF round trip that [ADR-0007](DECISIONS.md) makes claims about, including one asserting that provenance *does not* survive it. 16 guard the affordance composition, one of them named `test_there_is_no_can_verdict_anywhere`. 10 guard the MCP surface against the two ways it would quietly go wrong — a tool that takes a file path, and a tool that strips its caveats. And two validate emitted output against **OpenBuildCore's own schema file**, not a copy of it — skipping honestly if that repo is not checked out beside this one.
 
 Three of the Rust tests are `compile_fail` doctests, which is the only way to assert a guarantee that exists in the type system: passing `Degrees` where `Radians` is required does not compile, and neither does converting a `StallTorque` into a `ContinuousTorque`.

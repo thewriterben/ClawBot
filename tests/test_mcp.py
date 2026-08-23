@@ -28,13 +28,28 @@ class Skip(Exception):
     pass
 
 
+def _skip(reason: str):
+    """Skip in a way BOTH runners understand.
+
+    `raise Skip(...)` is caught by the __main__ runner below and reads as a
+    FAILURE under pytest, which turns "this peer is not checked out" into a red
+    build. pytest's own skip raises a BaseException subclass, so the runner
+    below has to catch it by name rather than by type.
+    """
+    import sys
+    if "pytest" in sys.modules:
+        import pytest
+        pytest.skip(reason)
+    raise Skip(reason)
+
+
 def load():
     try:
         from clawbot_mcp import server
     except SystemExit as exc:                       # the SDK's absence message
-        raise Skip(str(exc))
+        _skip(str(exc))
     except ImportError as exc:
-        raise Skip(f"MCP SDK not importable: {exc}")
+        _skip(f"MCP SDK not importable: {exc}")
     return server
 
 
@@ -151,12 +166,17 @@ if __name__ == "__main__":
         try:
             fn()
             print(f"pass  {name}")
-        except Skip as exc:
-            skipped += 1
-            print(f"SKIP  {name} — {exc}")
         except AssertionError as exc:
             failed += 1
             print(f"FAIL  {name} — {exc}")
+        except BaseException as exc:              # noqa: BLE001 - see _skip
+            # AFTER AssertionError, which is itself a BaseException: the other
+            # order swallows the failure branch entirely and re-raises real
+            # failures instead of counting them.
+            if type(exc).__name__ not in ("Skip", "Skipped"):
+                raise
+            skipped += 1
+            print(f"SKIP  {name} — {exc}")
     print(f"\n{len(tests) - failed - skipped}/{len(tests)} passed"
           + (f", {skipped} skipped" if skipped else ""))
     sys.exit(1 if failed else 0)
