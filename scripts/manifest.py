@@ -195,14 +195,13 @@ def as_project(robot: dict, manifest: dict) -> dict:
     name = " ".join(filter(None, [robot.get("make"), robot.get("model")])) \
         or robot.get("robot_id", "robot")
 
-    # OpenBuildCore's project schema is additionalProperties:false and has no slot
-    # for a policy declaration, so the declaration CANNOT travel as data through
-    # this format. Carrying it as prose in `description` is the only channel that
-    # exists and it is not machine-readable. Reported as a gap rather than
-    # smuggled: see the note manifest.py prints alongside (ADR-0019).
+    # The declaration travels as DATA as of 2026-08-23. It used to go as prose in
+    # `description`, because OpenBuildCore's project schema was
+    # additionalProperties:false with no slot for it — reported as OpenBuildCore#9,
+    # fixed by its ADR-0007, and the field is now `policy_categories` with BINGO's
+    # own name and shape (ClawBot ADR-0022).
     policy = robot.get("policy") or {}
-    declared = ", ".join(policy.get("categories", [])) or "undeclared"
-    return {
+    project = {
         "schema_version": 0,
         "id": robot["robot_id"],
         "name": f"Build {name}",
@@ -211,13 +210,18 @@ def as_project(robot: dict, manifest: dict) -> dict:
             f"{len(robot.get('links', []))} link(s) and "
             f"{len(robot.get('joints', []))} joint(s). "
             f"Emitted from a ClawBot robot record by scripts/manifest.py; the "
-            f"mechanism's own definition stays in ClawBot. "
-            f"Policy categories declared: {declared} "
-            f"(against {policy.get('taxonomy_version', 'no version')}). "
-            f"Carried as prose because this schema has no field for it."
+            f"mechanism's own definition stays in ClawBot."
         ),
         "requires": requires,
     }
+    if policy.get("categories"):
+        project["policy_categories"] = list(policy["categories"])
+    # The taxonomy_version deliberately does NOT travel. BINGO does not version at
+    # the asset — it freezes the category list's hash into the job at order time —
+    # so OpenBuildCore has no field for it and inventing one would fork a
+    # mechanism that is already solved elsewhere. It stays in the ClawBot record,
+    # where a reader can see what the author declared against.
+    return project
 
 
 def render(manifest: dict, robot: dict) -> str:
@@ -306,10 +310,10 @@ def main() -> int:
             return 1
         for note in notes:
             print(f"note: {note}", file=sys.stderr)
-        print("note: OpenBuildCore's project schema is additionalProperties:false and "
-              "has no field for a policy declaration, so the declaration travels only "
-              "as PROSE in `description` and is not machine-readable downstream. That "
-              "is a gap worth reporting upstream, not a thing to smuggle (ADR-0019).",
+        print("note: the declaration travels as `policy_categories`, machine-readable. "
+              "Its taxonomy_version does not — BINGO pins an id's meaning by freezing "
+              "the list hash into the job at order time, so there is no asset-level "
+              "field for it and inventing one would fork a solved mechanism (ADR-0022).",
               file=sys.stderr)
         print(json.dumps(as_project(robot, manifest), indent=2))
     elif args.json:

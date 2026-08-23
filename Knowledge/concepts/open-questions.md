@@ -76,10 +76,15 @@ none of those fields has a home upstream.
   Not yet a conflict, because they answer different questions (what the part speaks; what it is
   wired to on this machine), but it is the one field to watch.
 
-**Still open, and now sharper:** OPC has no entry for the XM430 at all, so ClawBot's first
-record carries no `part_id`. Whether ClawBot records should *require* one, or whether an
-uncatalogued actuator is a legitimate state, is a real question the manifest emitter already
-half-answers by reporting uncatalogued parts separately rather than dropping them.
+**Closed 2026-08-23.** OPC had no entry for the XM430, so the first record here carried no
+`part_id`. One was contributed upstream and merged (OpenPartsCore#4), and this record now cites
+`electronic/dynamixel-xm430-w350`. The two records sit side by side sharing **zero** fields,
+which is the boundary tested rather than argued.
+
+The residual question — whether a ClawBot record should *require* a `part_id`, or whether an
+uncatalogued actuator is a legitimate state — answers itself in the negative: the XM430 was
+uncatalogued for a day and the record was correct throughout. `manifest.py` already reports
+uncatalogued parts separately rather than dropping them, which is the right shape.
 
 ### 4. Radians in the file (ADR-0005) protects against one bug and invites another
 

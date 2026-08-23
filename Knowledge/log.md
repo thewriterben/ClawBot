@@ -786,3 +786,49 @@ the ROADMAP so the question gets asked rather than drifted past.
 Rejected: a `typical` value beside the range. It would be read as the answer, the range would
 become decoration, and no vendor publishes one — a midpoint invented here would be a number with
 no source sitting between two that have one.
+
+---
+
+## [2026-08-23] build | Three promises came due at once
+
+Seven pull requests merged across five repositories, and three things this repo had written down
+as *waiting on a merge* stopped waiting. All three were commitments made in prose — the kind that
+quietly become false rather than loudly failing.
+
+**The `part_id` resolves.** [[openpartscore]] merged `electronic/dynamixel-xm430-w350`,
+contributed from here because the registry had no entry for it. The actuator record's note said
+"No part_id: OpenPartsCore has no entry for this actuator", which stopped being true the moment
+that merged. Now cited, and the two records sit side by side sharing **zero fields** — upstream
+carries identity, mass, gear ratio, sensor and operating temperature; this carries what the
+actuator does in a mechanism. Open-question 3 closes on evidence rather than argument.
+
+Its residual half answers itself in the negative. *Should a record require a `part_id`?* No: the
+XM430 was uncatalogued for a day and the record was correct throughout.
+
+**The declaration travels as data** (ADR-0022). ADR-0019 recorded that OpenBuildCore's project
+schema was `additionalProperties: false` with no slot for a policy declaration, so a declared
+category could only go as prose in `description`. Reported as OpenBuildCore#9, fixed by its
+ADR-0007, merged.
+
+What made the change three lines rather than a migration is worth keeping: **ADR-0019 refused to
+smuggle the field into `description` as a field, and refused to invent a name.** So when the real
+field arrived it already had the name BINGO had specified, and nothing had to be unpicked.
+
+The `taxonomy_version` deliberately does *not* travel. This repo requires it because an id
+without its list version is a string whose meaning lives elsewhere; BINGO solves the same problem
+by freezing the list hash into the **job** at order time. Adding an asset-level version upstream
+would fork a working mechanism, so the version stays here and the id travels alone into a system
+that pins it.
+
+**Two tests rewritten rather than deleted**, and the docstrings keep the history, because the
+failure they used to guard is the interesting one: *a declaration that does not travel as data
+reads, downstream, as no declaration at all* — and BINGO treats an absent declaration as `none`
+**declared**, with fraud consequences. The hazard did not go away. It moved upstream, to where
+the field now exists to prevent it.
+
+**A property of the CI design got exercised for the first time.** ClawBot's workflow checks out
+[[openbuildcore]]'s `main` **at run time**, so that repo's schema change could have turned this
+repo red with no commit here. It did not — `policy_categories` is optional, so every previously
+valid document stayed valid — but the coupling is real and now demonstrated. It is the price of
+the two seam tests validating against a peer's *own* schema file rather than a copy, and the copy
+would have been worse: it would have gone stale silently instead of failing loudly.

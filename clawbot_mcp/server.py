@@ -236,10 +236,11 @@ def bill_of_parts(robot_id: str, assembly_id: str = "", harness_id: str = "",
         "manifest": built,
         "openbuildcore_project": manifest_lib.as_project(robot, built),
         "policy_notes": notes,
-        "declaration_is_prose_only": (
-            "OpenBuildCore's project schema is additionalProperties:false and has no "
-            "field for a policy declaration, so it travels only as prose in "
-            "`description` and is not machine-readable downstream (ADR-0019)"),
+        "declaration_travels_as": (
+            "`policy_categories`, machine-readable, as of 2026-08-23. Its "
+            "taxonomy_version does not travel: BINGO pins an id's meaning by freezing "
+            "the category list hash into the job at order time, so there is no "
+            "asset-level field for it (ADR-0022)"),
     }
 
 

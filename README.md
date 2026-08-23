@@ -2,7 +2,7 @@
 
 Describe a robot once — links, joints, actuators, and where every number came from. Then ask what it can actually reach, and what it can actually hold there.
 
-**Status:** pre-alpha. Four schemas, twenty-one ADRs, six scripts, an MCP surface, a zero-dependency Rust binding, **152 Python tests and 35 Rust tests**, all run by CI, and a knowledge base whose robotics half is no longer empty. `data/` holds one real record — a Dynamixel XM430-W350, written from the vendor's own manual, whose continuous torque is `null` because ROBOTIS names the stall/continuous distinction and then publishes only stall. No robot record yet: that needs a real mechanism in hand, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
+**Status:** pre-alpha. Four schemas, twenty-two ADRs, six scripts, an MCP surface, a zero-dependency Rust binding, **154 Python tests and 35 Rust tests**, all run by CI, and a knowledge base whose robotics half is no longer empty. `data/` holds one real record — a Dynamixel XM430-W350, written from the vendor's own manual, whose continuous torque is `null` because ROBOTIS names the stall/continuous distinction and then publishes only stall. No robot record yet: that needs a real mechanism in hand, and a described-from-memory arm is exactly the invented data the schema exists to refuse.
 
 ```
 python scripts/validate.py                     # uncited claims, degrees in _rad, non-trees
@@ -13,7 +13,7 @@ python scripts/affordance.py <id> --target X,Y,Z --payload-g N   # can this body
 python scripts/urdf.py import <file.urdf>      # reads the XML, not the parsed tree
 python -m clawbot_mcp.server                   # the same answers over MCP
 python scripts/emit_rust.py --check            # is the committed binding stale?
-python -m pytest tests/ -q                     # 152 tests
+python -m pytest tests/ -q                     # 154 tests
 cd bindings/rust && cargo test                 # 35 more, 3 of them compile_fail
 ```
 

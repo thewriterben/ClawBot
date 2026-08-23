@@ -563,7 +563,7 @@ pub const ACTUATORS: &[Actuator] = &[
         make: Some("ROBOTIS"),
         model: Some("XM430-W350-T/R"),
         kind: "smart-servo",
-        part_id: None,
+        part_id: Some("electronic/dynamixel-xm430-w350"),
         stall_torque: &[
             StallTorque { newton_metres: 3.8_f64, at_volts: 11.1_f64, at_amps: Some(2.1_f64) },
             StallTorque { newton_metres: 4.1_f64, at_volts: 12.0_f64, at_amps: Some(2.3_f64) },
