@@ -43,7 +43,14 @@ def test_records_are_sorted_by_id_so_a_reorder_is_not_a_diff():
     text = emit_rust.render()
     ids = [a["actuator_id"] for a in emit_rust.load("actuators", "actuator_id")]
     assert ids == sorted(ids)
-    positions = [text.index(json.dumps(i)) for i in ids]
+    # Search inside the ACTUATORS array only. A robot's joint carries an
+    # `actuator_id`, and ROBOTS is emitted first, so the first occurrence of an
+    # actuator id in the whole file is a CROSS-REFERENCE rather than the
+    # definition -- and the test would be measuring the order of the references.
+    # That went unnoticed while `data/` held no robot, and broke on the day the
+    # first one landed. The definitions were sorted correctly throughout.
+    start = text.index("pub const ACTUATORS:")
+    positions = [text.index(json.dumps(i), start) for i in ids]
     assert positions == sorted(positions)
 
 

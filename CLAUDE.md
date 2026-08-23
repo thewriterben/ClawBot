@@ -69,7 +69,11 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty-two ADRs, six stdlib
 scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`, `emit_rust`), an MCP
 surface and a zero-dependency Rust binding. 154 Python tests, 35 Rust tests, all run by CI. `data/` holds two
-real actuator records; no robot record yet, and that one needs hardware in hand.
+real actuator records and one robot record — a two-DOF pan-tilt, written BEFORE the build so
+`validate.py` is the checklist rather than the audit. Its structure and actuator wiring are real;
+every dimension is a `TODO(source)` placeholder and both joints have `limits: null`, so `reach`,
+`affordance` and URDF export all refuse and name the joint. That is the record working, not a
+record half-done.
 
 Do not write a README claim the code does not support. Equally: do not leave a status claim
 standing after the code has moved past it — this section said "no code" for exactly as long as

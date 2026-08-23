@@ -1,0 +1,78 @@
+{
+  "schema_version": 0,
+  "robot_id": "pan-tilt-mg90s",
+  "kind": "pan-tilt",
+  "base_link": "base",
+
+  "links": [
+    {
+      "link_id": "base",
+      "make": {
+        "size_mm": { "x": 1, "y": 1, "z": 1 },
+        "material": "petg"
+      },
+      "note": "Holds the pan servo. size_mm is a PLACEHOLDER and blocks the machine check until the bracket is drawn. material is a real design decision and petg is a proposal, not a finding: PLA creeps under a sustained holding load, which is what a servo bracket does all day. Change it if the build says otherwise.",
+      "source": { "citation": "TODO(source)" }
+    },
+    {
+      "link_id": "yoke",
+      "make": {
+        "size_mm": { "x": 1, "y": 1, "z": 1 },
+        "material": "petg"
+      },
+      "note": "Driven by the pan servo, carries the tilt servo. Must straddle the pan axis rather than hang beside it - see the tilt joint's origin note for what that buys.",
+      "source": { "citation": "TODO(source)" }
+    },
+    {
+      "link_id": "head",
+      "make": {
+        "size_mm": { "x": 1, "y": 1, "z": 1 },
+        "material": "petg"
+      },
+      "note": "Driven by the tilt servo. Whatever it carries is a tool and belongs in `tool`, not in this link's size.",
+      "source": { "citation": "TODO(source)" }
+    }
+  ],
+
+  "joints": [
+    {
+      "joint_id": "pan",
+      "type": "revolute",
+      "parent": "base",
+      "child": "yoke",
+      "origin": {
+        "xyz_mm": { "x": 0, "y": 0, "z": 1 }
+      },
+      "axis": { "x": 0, "y": 0, "z": 1 },
+      "limits": null,
+      "actuator_id": "towerpro-mg90s",
+      "gear_ratio": 1,
+      "note": "base_link's frame is the bottom face of the base bracket, on the pan axis, z up (ADR-0009 - every answer is relative to base_link, and it has to be pinned to something). x and y are therefore EXACTLY 0 by construction, not measured: the pan axis defines the frame it is expressed in. z is a PLACEHOLDER - the height from that face to the servo's output face. gear_ratio 1 because the horn bolts to the yoke directly. limits null is UNKNOWN, never full travel: the servo's own +/-pi/2 is recorded on the actuator, but the JOINT limit is the tighter of that, mechanical interference, and what the cable permits (ADR-0012), and none of those exist until the thing is built.",
+      "source": { "citation": "TODO(source)" }
+    },
+    {
+      "joint_id": "tilt",
+      "type": "revolute",
+      "parent": "yoke",
+      "child": "head",
+      "origin": {
+        "xyz_mm": { "x": 0, "y": 0, "z": 1 }
+      },
+      "axis": { "x": 0, "y": 1, "z": 0 },
+      "limits": null,
+      "actuator_id": "towerpro-mg90s",
+      "gear_ratio": 1,
+      "note": "THE TILT AXIS INTERSECTS THE PAN AXIS. That is a design commitment, and it is why x and y are 0 here rather than measured numbers carrying the caliper's +/-0.10 mm band. It also means pan rotation does not translate the tilt axis, so the reachable set is a surface of revolution that can be checked by hand - a known-answer test rather than a pinned-output one. If the build instead hangs the tilt servo beside the pan axis, these two zeroes become measurements and this note is wrong. z is a PLACEHOLDER: the pan-axis-to-tilt-axis distance. Both servos are the same part, so the same 8 mm shaft-to-top-hole offset places both axes from their bracket hole patterns.",
+      "source": { "citation": "TODO(source)" }
+    }
+  ],
+
+  "tool": null,
+  "measured_payload": null,
+
+  "source": {
+    "citation": "TODO(source)"
+  },
+
+  "note": "WRITTEN BEFORE THE BUILD, ON PURPOSE. The structure and the actuator wiring are real; every dimension is a placeholder that fails loudly. This inverts the usual order so that `python scripts/validate.py` is the build checklist rather than a post-hoc audit - it names what is still owed instead of letting a missing number pass as a zero.\n\nFour numbers are owed from CAD: the pan joint's z, the tilt joint's z, and a size_mm box for each of the three links.\n\nTwo more are owed from the assembled hardware, and they come LAST for a reason. Both joints' limits are null, and a limit cannot be established from the servo's datasheet travel: it is the tighter of servo travel, mechanical interference, and what the cable run permits. The cable can only be judged once it is routed, which is why the harness record follows the build rather than preceding it (ADR-0012). Reading a null here as full travel would make every reach answer over-claim.\n\nNOT DECLARED: `policy` is absent, which means UNDECLARED and is not the same as declaring none (PD-5, ADR-0019). Every derivation still runs; the only thing it blocks is `manifest.py --as-project`, because that document goes to a network which reads an absent declaration AS a 'none' declaration. Declaring on the author's behalf is the one thing this repo will not do.\n\nOne hardware caveat that outlives this file: the K2 Plus is recorded in OpenBuildCore with axis_calibration null and a measured Y residual of +0.83% against X at -0.25%. Printing structural links before that is fixed puts a known error into every link length, and the record would then cite a CAD model the hardware does not match."
+}
