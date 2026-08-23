@@ -6,6 +6,7 @@ sources:
   - Nabtesco Motion Control, "Does Zero Backlash in Gearboxes exist?" (retrieved 2026-08-23, https://www.nabtescoprecision.com/gearbox-backlash/)
   - Nabtesco, FAQ glossary — "Backlash" (retrieved 2026-08-23, https://www.nabtesco.de/en/service/faq/glossar/backlash)
   - ANSI/AGMA 2002-D19, "Tooth Thickness and Backlash Measurement of Cylindrical Involute Gearing" — title and public listing only; the standard itself is paywalled and was **not** read (https://webstore.ansi.org/standards/agma/ansiagma2002d19)
+  - Harmonic Drive LLC, "FR Gearing — Precision Gearing and Motion Control", engineering data, 16 pp. (retrieved 2026-08-22, https://www.harmonicdrive.net/_hd/content/documents/fr.pdf) — prose only; see the extraction note
 ---
 
 # Backlash — two vendors mean different things by the word, and the standard named after it measures something else
@@ -71,24 +72,71 @@ the title and a public abstract. It is enough to say *"a similarly-named standar
 appears to answer a different question"* and not enough to say *"no standard covers assembled
 reducers"* — so this page says the first and refuses the second.
 
+## The second vendor, and it is the other side of Nabtesco's sentence
+
+Harmonic Drive's FR engineering data — already in this repo's citation chain via
+[[gearbox-efficiency]] — was read on 2026-08-23. It settles the question, and not by supplying a
+different percentage.
+
+**"Lost motion" and "hysteresis" do not appear in the document at all.** What it defines instead:
+
+> "The backlash in an assembled component set is defined as pure play existing between the input
+> and output."
+
+> "Values are measured at output with input locked."
+
+**That is precisely the definition Nabtesco named and disclaimed.** Nabtesco wrote that "many
+gearbox manufacturers choose to use the standard definition of backlash, which is just the amount
+of free travel between parts". Harmonic Drive is one of them, in its own words, in a document this
+repo already cites. The incomparability is no longer inferred from one vendor's characterisation
+of others — **both parties are on the record, and they disagree.**
+
+Note what the disagreement actually is. Nabtesco reads lost motion *at a stated load* (3% of rated
+torque). Harmonic Drive measures backlash as pure play with **no applied torque named at all**, and
+handles the low-torque region separately:
+
+> "The gear exhibits soft windup characteristics in the low torque region."
+
+> "...the torsional stiffness of the FR component set may be evaluated by dividing the
+> torque-torsion curve in three major regions: a small torque region 0–T1, a middle torque region
+> T1–T2, and a linear region T2–T3."
+
+So the two vendors do not merely apply different percentages to the same quantity. **They
+decompose the phenomenon differently and publish quantities that do not correspond** — one
+arc-minute figure read at 3% of rated torque, versus a pure-play figure plus a three-region spring
+rate. A consumer cannot convert between them, and averaging them would be meaningless. That is a
+stronger result than the different-percentages claim this page went looking for.
+
+## Extraction note — prose only, and no number from this reading
+
+The FR document resisted every ordinary tool: `pdftoppm` is not installed, no Python PDF library was
+available, and both WebFetch attempts returned only binary. It was read by decompressing the content
+streams with `zlib` and undoing a subset-font shift by hand.
+
+**That method recovers prose and destroys numerals.** The passage on spring-rate variation comes
+back as *"the spring rate of an individual unit may vary within approximately ___ of the average"* —
+the ±30% that [[gearbox-efficiency]] quotes is simply absent from the extraction, as is the
+minutes-of-arc figure for optimised Series R units. **No number on this page is taken from that
+reading**, and none should be. The prose is quoted; every figure still comes from the earlier
+verified read.
+
+The decoder was validated before any of it was trusted, against a sentence [[gearbox-efficiency]]
+had already verified independently: *"Values quoted are based on actual tests with the component
+sets assembled in their housings and inclusive of friction resistance of oil seals and churning of
+oil."* It reproduced it exactly. A decoder that had drifted would have failed there first.
+
 ## What is still not sourced
 
 The original trade-press claim had specifics beyond the core: that manufacturers commonly average
-four or more points on the output shaft, and that some apply 2% of rated torque to generate the
-rating while others apply less. **Neither is sourced.** Nabtesco's 3% is now primary, but a
-*second* vendor's differing percentage — which is what would make "they differ" a demonstrated
-fact rather than a reasonable inference from one data point — was looked for and not found in a
-readable primary document.
-
-**Conflict, unresolved:** [[gearbox-efficiency]]'s source, Harmonic Drive's FR engineering data,
-would be the natural second vendor and is already in this repo's citation chain. Its PDF could
-not be text-extracted with the tooling available, so whether Harmonic Drive defines lost motion
-at a different percentage is **unknown, not absent**. Worth one look by a human with the PDF open.
+four or more points on the output shaft, and that some apply 2% of rated torque while others apply
+less. **Neither is sourced, and the four-point averaging claim now looks doubtful** — neither vendor
+read here describes averaging over points at all. Recorded as unsupported rather than disproved:
+two vendors are not the market.
 
 ## Consequence for the schema
 
 **Still no rule, and the reason has changed for the better.** The `backlash_rad` note can stop
-saying its basis is secondary — the incomparability is a vendor's own words now. What it must
+saying its basis is secondary — the incomparability is now two vendors' own words, on both sides. What it must
 keep saying is that this licenses no *value*: a figure whose meaning depends on the definition
 applied is exactly the shape ADR-0018 and ADR-0021 already handle, and neither needs superseding.
 Absent still means UNKNOWN.

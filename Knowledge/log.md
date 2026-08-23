@@ -867,3 +867,31 @@ with the tooling to hand. One look by a human with the file open would settle it
 **No ADR.** Nothing was decided that ADR-0018 and ADR-0021 had not already decided. A note's
 evidence standing improved, and the schema description now says primary where it said SECONDARY.
 Changing a description is not changing a rule, and the rule — absent means UNKNOWN — is untouched.
+
+## [2026-08-23] ingest | The second vendor was in the citation chain all along
+
+Source: Harmonic Drive LLC, FR engineering data (already cited by [[gearbox-efficiency]]).
+→ [[backlash-measurement]]
+
+The entry above closed the backlash claim as half-sourced and left one thing open: whether Harmonic
+Drive defines lost motion at a percentage other than Nabtesco's 3%. It was recorded as **unknown
+rather than absent**, because the PDF would not yield to any tool to hand.
+
+**It does not define lost motion at all.** Neither "lost motion" nor "hysteresis" occurs in the
+document. It defines backlash as *"pure play existing between the input and output"*, *"measured at
+output with input locked"* — which is exactly the definition Nabtesco named as the one "many gearbox
+manufacturers choose to use" and distinguished its own from. Both parties to the disagreement are
+now on the record, and one of them was already in this repo's bibliography.
+
+**The finding is better than the one being looked for.** The question assumed the two vendors
+measure the same quantity at different loads. They do not: Nabtesco reads one arc-minute figure at
+3% of rated torque, while Harmonic Drive publishes pure play with no torque named, plus a
+three-region spring rate for the low-torque behaviour. The quantities do not correspond and cannot
+be converted. "Not comparable without their methods" turns out to understate it.
+
+**Method, recorded because it constrains what may be quoted.** The PDF was read by decompressing its
+content streams with `zlib` and undoing a subset-font shift by hand — no PDF library was available.
+That recovers prose and **destroys numerals**: the ±30% spring-rate variation comes back as
+"approximately ___ of the average". So the page quotes prose only and takes **no number** from this
+reading. The decoder was validated first against a sentence already verified independently — the oil
+seals and churning-of-oil quote — and reproduced it exactly.
