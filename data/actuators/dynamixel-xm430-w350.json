@@ -1,10 +1,10 @@
 {
   "schema_version": 0,
   "actuator_id": "dynamixel-xm430-w350",
+  "part_id": "electronic/dynamixel-xm430-w350",
   "make": "ROBOTIS",
   "model": "XM430-W350-T/R",
   "type": "smart-servo",
-
   "stall_torque_nm": [
     {
       "value": 3.8,
@@ -37,9 +37,7 @@
       }
     }
   ],
-
   "continuous_torque_nm": null,
-
   "no_load_speed_rad_s": [
     {
       "value": 4.50294947014537,
@@ -69,12 +67,10 @@
       }
     }
   ],
-
   "travel": {
     "lower_rad": 0,
     "upper_rad": 6.283185307179586
   },
-
   "gearbox": {
     "ratio": 353.5,
     "source": {
@@ -83,16 +79,12 @@
       "retrieved": "2026-08-22"
     }
   },
-
   "feedback": "magnetic-encoder",
-
   "mass_g": 82,
-
   "source": {
     "citation": "ROBOTIS e-Manual, Dynamixel XM430-W350",
     "url": "https://emanual.robotis.com/docs/en/dxl/x/xm430-w350/",
     "retrieved": "2026-08-22"
   },
-
-  "note": "The first record in this repo, and it exists mainly to demonstrate what the schema refuses. continuous_torque_nm is null on a good datasheet from a vendor who explicitly states the distinction: 'The given Stall torque rating for a servo is different from its continuous output rating.' ROBOTIS names it, publishes a performance graph, and publishes no continuous figure. So capacity over this actuator is UNDERIVABLE and every hold answer naming it will say so — which is ADR-0004 working, not failing. Do not fill it from the 30-50%-of-stall rule of thumb; that range spans a factor of 1.67 and how_determined exists to reject it. The fix is a path somebody can walk: measure it, hold it to thermal steady state, record the method. Three voltage rows are why ADR-0014 made these fields arrays: 3.8 to 4.8 N.m is a 26% spread across this actuator's own rated range, so a derivation that picks the wrong row is wrong by that much, silently. travel is the 0-360 deg Position Control Mode range; Extended Position Control Mode is multi-turn, so continuous_rotation is deliberately not asserted here rather than guessed. gearbox.type is absent because the datasheet section read did not state the gear train type, and backlash_rad is absent meaning UNKNOWN, never zero. No part_id: OpenPartsCore has no entry for this actuator. Its electronic/sg90 entry shows what an OPC servo record does carry - identity, bus, capabilities, connector - and what it does not: no torque, no speed, no mass. That is the actuator/parts boundary of open-questions #3, tested against a real pair of records for the first time, and the split holds. Operating temperature -5 to +80 C and the 12-bit contactless absolute encoder are recorded here as prose because the schema has no field for either."
+  "note": "The first record in this repo, and it exists mainly to demonstrate what the schema refuses. continuous_torque_nm is null on a good datasheet from a vendor who explicitly states the distinction: 'The given Stall torque rating for a servo is different from its continuous output rating.' ROBOTIS names it, publishes a performance graph, and publishes no continuous figure. So capacity over this actuator is UNDERIVABLE and every hold answer naming it will say so \u2014 which is ADR-0004 working, not failing. Do not fill it from the 30-50%-of-stall rule of thumb; that range spans a factor of 1.67 and how_determined exists to reject it. The fix is a path somebody can walk: measure it, hold it to thermal steady state, record the method. Three voltage rows are why ADR-0014 made these fields arrays: 3.8 to 4.8 N.m is a 26% spread across this actuator's own rated range, so a derivation that picks the wrong row is wrong by that much, silently. travel is the 0-360 deg Position Control Mode range; Extended Position Control Mode is multi-turn, so continuous_rotation is deliberately not asserted here rather than guessed. gearbox.type is absent because the datasheet section read did not state the gear train type, and backlash_rad is absent meaning UNKNOWN, never zero. part_id resolves as of 2026-08-23: OpenPartsCore merged electronic/dynamixel-xm430-w350, contributed from here because the registry had no entry. The two records now exist side by side and share ZERO fields - upstream carries identity, mass, gear ratio, sensor and operating temperature; this carries what the actuator does in a mechanism. That is the actuator/parts boundary of open-questions #3, and it held on first contact. Note the id is stored and never resolved (ADR-0006): a consumer wanting the upstream facts reads the registry itself. Operating temperature -5 to +80 C and the 12-bit contactless absolute encoder are recorded here as prose because the schema has no field for either."
 }

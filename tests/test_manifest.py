@@ -240,16 +240,41 @@ def test_clawbot_never_infers_a_category():
         assert inferring not in gate, f"the policy gate reads {inferring}"
 
 
-def test_the_declaration_cannot_travel_as_data_and_that_is_reported():
-    """OpenBuildCore's project schema is additionalProperties:false, so there is
-    no field for it. Prose is the only channel, and it is not machine-readable."""
+def test_the_declaration_travels_as_data():
+    """Was the opposite assertion until 2026-08-23. OpenBuildCore's project schema
+    is additionalProperties:false and had no field for a policy declaration, so it
+    could only go as prose in `description` — reported as OpenBuildCore#9 and fixed
+    by its ADR-0007. This test is kept rather than deleted because the failure it
+    used to guard is the interesting one: a declaration that does not travel as
+    data reads, downstream, as no declaration at all."""
     robot = declared("regulated.medical")
     project = manifest.as_project(robot, manifest.build_manifest(robot, None, None))
-    assert "regulated.medical" in project["description"]
-    assert "policy" not in project
-    schema = load_obc_schema()
+    assert project["policy_categories"] == ["regulated.medical"]
+    assert "regulated.medical" not in project["description"],         "no longer smuggled through prose"
     import jsonschema
-    jsonschema.validate(project, schema)
+    jsonschema.validate(project, load_obc_schema())
+
+
+def test_the_taxonomy_version_deliberately_does_not_travel():
+    """BINGO pins an id's meaning by freezing the list hash into the JOB at order
+    time, not at the asset. Inventing an asset-level version field would fork a
+    mechanism that is already solved, so it stays in the ClawBot record."""
+    robot = declared("regulated.rf")
+    project = manifest.as_project(robot, manifest.build_manifest(robot, None, None))
+    assert "taxonomy_version" not in project
+    assert robot["policy"]["taxonomy_version"], "but it is kept where it was declared"
+
+
+def test_an_undeclared_record_emits_no_policy_field_at_all():
+    """Belt and braces on the refusal: check_policy stops an undeclared record
+    before it reaches here, and if that ever regressed, emitting an ABSENT field
+    is still safer than emitting an empty one — BINGO reads absent as `none`
+    declared and an empty list as neither."""
+    robot = fixture_robot()
+    project = manifest.as_project(robot, manifest.build_manifest(robot, None, None))
+    assert "policy_categories" not in project
+    import jsonschema
+    jsonschema.validate(project, load_obc_schema())
 
 
 if __name__ == "__main__":

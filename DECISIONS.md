@@ -1229,3 +1229,47 @@ belong in the record, because a reader checking against the datasheet will be lo
 Rejected: a single `typical` value alongside the range. It would be read as the answer, the range
 would become decoration, and the vendor does not publish one — inventing a midpoint would be a
 number with no source sitting between two that have one.
+
+---
+
+## ADR-0022 — The upstream gap closed, so the declaration travels as data
+
+**Date:** 2026-08-23
+**Status:** accepted (records a consequence of ADR-0019 changing; its decision is untouched)
+
+**Context.** ADR-0019 gave this repo its PD-5 position and recorded one consequence found while
+implementing it: OpenBuildCore's project schema is `additionalProperties: false` and had **no
+field for a policy declaration**, so a declared category could only travel as **prose** in
+`description`. `manifest.py` printed a note saying so rather than smuggling the field in.
+
+That was reported as OpenBuildCore#9 and fixed by its ADR-0007, which added
+`policy_categories` with Project BINGO's own field name and shape. It is on that repo's `main`
+as of 2026-08-23.
+
+**Decision.** `manifest.py --as-project` emits `policy_categories` as data. The prose in
+`description` goes, because carrying the same claim in two places is how the two disagree later.
+
+**The `taxonomy_version` deliberately does not travel**, and this is the part worth recording.
+ClawBot requires it on a record (ADR-0019) because a category id without the version of the list
+it came from is a string whose meaning lives somewhere else. BINGO solves the same problem
+differently — it **freezes the category list's hash into the job at order time**, so an id is
+pinned by the order rather than by the asset. Adding an asset-level version field to
+OpenBuildCore would fork a mechanism that already works. So the version stays in the ClawBot
+record, where a reader can see what the author declared against, and the id travels alone into a
+system that will pin it.
+
+**Consequences.** This is the first time a limitation this repo *reported* upstream has been
+fixed upstream and read back. Worth noting what made it work: ADR-0019 refused to smuggle the
+field into `description` **as a field**, and refused to invent a name — so when the real field
+arrived it had the name BINGO had already specified, and the change here was three lines rather
+than a migration.
+
+Two tests were rewritten rather than deleted. `test_the_declaration_cannot_travel_as_data...`
+became `test_the_declaration_travels_as_data`, and the docstring keeps the history, because the
+failure it used to guard is the interesting one: **a declaration that does not travel as data
+reads, downstream, as no declaration at all** — and BINGO treats an absent declaration as `none`
+*declared*, with fraud consequences. That hazard did not go away; it moved upstream, where the
+field now exists to prevent it.
+
+ADR-0019's decision is unchanged: absent still means undeclared, ClawBot still refuses to emit a
+fabrication-bound document for an undeclared record, and it still never infers a category.
