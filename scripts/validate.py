@@ -385,6 +385,11 @@ def check_actuator(path: Path, report: Report) -> str | None:
         report.warn(where, f"type '{kind}' with holding_torque_nm: a voltage-driven "
                            f"servo publishes stall torque against voltage. See "
                            f"stall_torque_nm (ADR-0014, ADR-0023)")
+    if not any((act.get("stall_torque_nm"), act.get("continuous_torque_nm"), holding)):
+        report.warn(where, "no torque figure of any kind: this actuator can size nothing, "
+                           "and every capacity answer naming it is 'incomplete'. Legitimate "
+                           "for a part no datasheet describes (ADR-0024); measuring one is "
+                           "what closes it")
     if holding and not act.get("continuous_torque_nm"):
         report.warn(where, "holding torque only, continuous is null: capacity is "
                            "underivable and that is the honest answer (ADR-0004)")

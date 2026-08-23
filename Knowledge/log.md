@@ -931,3 +931,30 @@ published as a vectorised drawing with zero text operators, so the `zlib` stream
 worked on the Harmonic Drive document returned nothing. The figures came from product listings
 instead. That is the second PDF this month to resist reading for a different reason, and the page
 says which of its numbers came from where.
+
+## [2026-08-23] finding | The warning in the MG90S record was right about its own hardware
+
+Source: the owner, on inspecting the parts. → ADR-0024
+
+`towerpro-mg90s` closed its note with a hedge: the MG90S is heavily cloned, these figures describe
+TowerPro's population, and if the unit on the bench is not a verified TowerPro then the record is
+cited for the wrong thing. **It was not.** The servos are unbranded — marked `MG90S` and
+`Micro servo`, no manufacturer mark.
+
+**The measurement had already said so and nobody read it that way.** Total height came to 26.3 mm
+against TowerPro's own 28.5 mm and 35.5 mm. That was recorded as *"the two TowerPro documents
+disagree with each other"*, which was true, and the more useful reading — *the part in hand agrees
+with neither, so it may be neither* — was available at the time and not taken. A discrepancy was
+treated as evidence about the documents when it was also evidence about the object.
+
+**Why `basis` was the wrong tool, which is the substance of ADR-0024.** [[gearbox-efficiency]]
+established `basis` from Harmonic Drive's ±30% statement: a published figure may describe a
+population rather than your unit. That presumes your unit is drawn from the population. A clone is
+not, so there is no population it is typical of, and marking the figure `model-typical` and using
+it anyway would assert exactly what is unknown — while looking like careful practice.
+
+**The outcome is a record whose evidence is a caliper rather than a document**, and it is *better*
+evidence than the branded record it replaced, because a measurement of the object in hand outranks
+a datasheet about a different object. Worth naming, since this wiki's discipline is easy to read as
+"prefer the published figure" — the actual rule is prefer the source that describes the thing you
+have.
