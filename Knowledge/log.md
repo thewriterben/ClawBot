@@ -732,3 +732,57 @@ both internally consistent, and "concepts mentioned repeatedly but with no page 
 The second needs a judgement about what deserves a page, and the frequency counts a script can
 produce are dominated by the vocabulary every page shares. Left for a human, and named here so
 the omission is visible rather than implied by a clean report.
+
+---
+
+## [2026-08-22] build | The fourth time the same defect showed up, and the first time it was caught before the field was written
+
+ADR-0018 closed gearbox efficiency by establishing it is the *wrong quantity* for a static hold —
+efficiency curves are indexed by input speed, and a held pose has none — and named what would
+actually be needed. This is that: **starting and backdriving torque**, from the same Harmonic
+Drive document.
+
+**The shape decided it.** For an FR 40, starting torque is 3–50 N·cm and backdriving torque is
+7–190 N·m. Not a value with a tolerance — a range spanning better than an order of magnitude,
+with the vendor's own method attached.
+
+That is the **fourth** appearance of one defect, and the first time this repo met it *before*
+writing the field rather than after. ADR-0004 deleted scalar `payload_kg` (varies with pose).
+ADR-0014 made torque an array (varies with voltage). ADR-0018 removed scalar `efficiency`
+(varies over five variables). Here the variation is not over an operating envelope at all — it is
+**unit to unit**, which is why a range is the right shape rather than an index, and why
+ADR-0018's `basis: model-typical` belongs on it.
+
+**The finding worth keeping: the two ends answer opposite questions.**
+
+*"Can this hold a load unpowered?"* is answered by the **minimum** — your unit might be the loose
+one, and assuming otherwise means a load that slips. *"Will this back-drive when I need it to,"*
+for hand-guiding or a fault that must not lock a joint, is answered by the **maximum** — your
+unit might be the stiff one.
+
+A single figure cannot serve both. Picking an end silently is wrong in a direction that depends
+on **a question the record does not know the caller is asking**, which is why the range is stored
+whole and neither the schema nor the Rust type offers an accessor that picks one.
+
+**And then the discipline bit, which was the harder call.** Neither field feeds a derivation.
+
+The tempting inference is right there: *a load below the backdriving minimum is held by the
+geartrain with no actuator torque*. It is probably true. It is also **a physical claim this repo
+has no source for** — the Harmonic Drive document publishes the numbers and their test method and
+says nothing about a relationship to a statically held load, and nothing else read here does
+either. Writing it into `hold` would be exactly the plausible uncited reasoning the invariant
+refuses, and more dangerous than most, because its failure mode is a joint that lets go rather
+than a wrong number on a screen.
+
+So `hold` is unchanged. What changed is that the data is here for when a source arrives.
+
+**A smell, named rather than ignored.** This repo now carries *three* recorded-but-unused fields:
+`measured_efficiency`, `harness.service_loop_mm`, and these two ranges. That is a real pattern and
+it could become hoarding. The defence is that each arrived because a **source** did, not because
+a feature was wanted, and each has a written condition for becoming useful. A fourth without one
+is the point to ask whether the schema has started collecting rather than modelling — recorded in
+the ROADMAP so the question gets asked rather than drifted past.
+
+Rejected: a `typical` value beside the range. It would be read as the answer, the range would
+become decoration, and no vendor publishes one — a midpoint invented here would be a number with
+no source sitting between two that have one.

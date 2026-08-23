@@ -393,6 +393,50 @@ def test_a_spread_without_a_basis_warns():
     assert warns(run("actuator", doc), "no basis")
 
 
+# ------------------------------ ADR-0021: ranges, and ends that answer opposites
+
+def gearbox_range(field, **over):
+    row = {"min": 0.03, "max": 0.5, "how_determined": "vendor table, converted from N.cm"}
+    row.update(over)
+    return actuator(gearbox={"ratio": 100, field: row})
+
+
+def test_a_torque_range_is_accepted():
+    assert run("actuator", gearbox_range("starting_torque_nm")).failures == []
+    assert run("actuator", gearbox_range("backdriving_torque_nm")).failures == []
+
+
+def test_an_inverted_range_is_refused():
+    doc = gearbox_range("backdriving_torque_nm", min=190.0, max=7.0)
+    assert refuses(run("actuator", doc), "above max")
+
+
+def test_a_range_with_no_method_is_refused():
+    doc = gearbox_range("starting_torque_nm", how_determined="   ")
+    assert refuses(run("actuator", doc), "no how_determined")
+
+
+def test_a_collapsed_range_warns_that_it_is_a_value_wearing_a_range():
+    """min == max validates, and it is worth surfacing: the field is a range
+    because the variation is unit-to-unit, so a single figure usually means
+    somebody collapsed one rather than that the vendor published one."""
+    doc = gearbox_range("backdriving_torque_nm", min=50.0, max=50.0)
+    report = run("actuator", doc)
+    assert report.failures == []
+    assert warns(report, "value wearing a range")
+
+
+def test_there_is_no_typical_field_to_collapse_a_range_into():
+    """ADR-0021's refusal: a typical would be read as the answer and the range
+    would become decoration."""
+    import json as _json
+    schema = _json.loads((Path(__file__).resolve().parents[1]
+                          / "schema" / "actuator.schema.json").read_text(encoding="utf-8"))
+    props = schema["$defs"]["torqueRange"]["properties"]
+    assert "typical" not in props
+    assert schema["$defs"]["torqueRange"]["additionalProperties"] is False
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_")]
     failed = 0

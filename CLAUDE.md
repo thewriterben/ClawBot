@@ -39,6 +39,9 @@ These are decided. If a change would introduce one, it needs a superseding ADR, 
 | A scalar `gearbox.efficiency` | Efficiency varies with input speed, ratio, load, temperature and lubricant — eight curves, no scalar | ADR-0018 |
 | A running efficiency applied to a static hold | Efficiency curves are indexed by input speed; a held pose has none. Wrong in kind, not in value | ADR-0018 |
 | Treating a catalogue figure as a fact about your unit | A vendor may be publishing a population average — ±30% unit-to-unit is stated in one datasheet | ADR-0018 |
+| A scalar starting or backdriving torque | Published as ranges spanning an order of magnitude, varying unit to unit | ADR-0021 |
+| A `typical` beside a range | It gets read as the answer and the range becomes decoration | ADR-0021 |
+| Deriving a passive hold from backdriving torque | That a load below the minimum is held unpowered is a physical claim with no source here, and it fails by letting go | ADR-0021 |
 | Inferring a policy category from geometry | A declaration is the author's claim about intent, not something a bounding box implies | ADR-0019 |
 | Emitting a fabrication-bound manifest for an undeclared record | BINGO reads an absent declaration AS `none` declared, so emitting makes that claim on the author's behalf | ADR-0019 |
 | A `policy_categories` enum in the schema | That forks a taxonomy whose own spec says growth needs a spec revision | ADR-0019 |
@@ -63,9 +66,9 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 
 ## Status
 
-Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty ADRs, six stdlib
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty-one ADRs, six stdlib
 scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`, `emit_rust`), an MCP
-surface and a zero-dependency Rust binding. 147 Python tests, 33 Rust tests. `data/` holds one
+surface and a zero-dependency Rust binding. 152 Python tests, 35 Rust tests, all run by CI. `data/` holds one
 real actuator record; no robot record yet, and that one needs hardware in hand.
 
 Do not write a README claim the code does not support. Equally: do not leave a status claim

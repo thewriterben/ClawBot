@@ -1157,3 +1157,75 @@ than papered over with a fixture pretending to be data.
 Rejected: a `Channel::command(...)` or anything else named like an instruction. ADR-0017 already
 refused predicates that look like safety authorities; the same reasoning applies to names that
 look like actions. `actuator_angle` describes what it returns, not what to do with it.
+
+---
+
+## ADR-0021 — Starting and backdriving torque are ranges, and the two ends answer opposite questions
+
+**Date:** 2026-08-22
+**Status:** accepted (picks up what ADR-0018 named)
+
+**Context.** ADR-0018 closed the gearbox-efficiency topic by establishing that efficiency is the
+wrong quantity for a static hold — efficiency curves are indexed by input speed, and a held pose
+has none. It named what would actually be needed: **starting torque and backdriving torque**,
+which the same Harmonic Drive document publishes as separate tables.
+
+Those tables have a shape worth stopping on. For an FR 40, starting torque is **3–50 N·cm** and
+backdriving torque is **7–190 N·m**
+([`Knowledge/sources/gearbox-efficiency.md`](Knowledge/sources/gearbox-efficiency.md)). Not a
+value with a tolerance — a range spanning better than an order of magnitude, and the vendor
+states its method:
+
+> "Values quoted are based on actual tests with the component sets assembled in their housings,
+> and inclusive of friction resistance of oil seals, and churning of oil."
+
+**Decision.** Both are recorded as **ranges**, `{ min, max, how_determined }`, and there is no
+scalar form of either.
+
+This is the fourth time this repo has met the same defect and the first time it has met it
+before writing the field rather than after. ADR-0004 deleted scalar `payload_kg` because capacity
+varies with pose. ADR-0014 made torque an array because it varies with voltage. ADR-0018 removed
+scalar `efficiency` because it varies over five variables. Here the variation is not over an
+operating envelope at all — it is **unit to unit**, which is why a range rather than an index is
+the right shape, and why `basis: model-typical` from ADR-0018 belongs on it.
+
+**The part that makes this more than a data-entry decision: the two ends answer opposite
+questions.**
+
+- *"Can this mechanism hold a load without powering the motor?"* is answered by the **minimum**.
+  The unit on your bench might be the loose one, and assuming otherwise means a load that slips.
+- *"Will this mechanism back-drive when I need it to — for hand-guiding, or for a fault that
+  must not lock the joint?"* is answered by the **maximum**. The unit might be the stiff one.
+
+A single figure cannot serve both, and picking an end silently is wrong in one direction or the
+other **depending on a question the record does not know the caller is asking**. So the range is
+stored whole and a consumer picks the end its question needs.
+
+**Neither feeds a derivation.** Recorded and unused, exactly as `gearbox.efficiency` was before
+it was removed and as `harness.service_loop_mm` still is.
+
+The reason is specific rather than lazy. The tempting inference — *a load below the backdriving
+minimum is held by the geartrain with no actuator torque* — is a **physical claim this repo has
+no source for.** The Harmonic Drive document publishes the numbers and their test method; it
+does not state a relationship between a backdriving figure and a statically held load, and
+nothing else read here does either. Writing that relationship into `hold` would be exactly the
+plausible, uncited reasoning the invariant refuses, and it would be more dangerous than most
+because its failure mode is a joint that lets go.
+
+So `hold` continues to report a static upper bound from continuous actuator torque and continues
+to say what it does not model. What changes is that the data is now here when a source for the
+relationship arrives.
+
+**Consequences.** A third recorded-but-unused field is a real smell, and worth naming as one:
+this repo now carries efficiency-shaped data, cable-slack data and geartrain-resistance data that
+nothing computes with. The defence is that each was added because a *source* arrived, not because
+a feature was wanted, and each has a written condition for becoming useful. If a fourth appears
+without one, that is the point to ask whether the schema is collecting rather than modelling.
+
+Units: `_nm` per the repo's rule, so a figure published in N·cm is converted on the way in and
+`how_determined` records the original. A conversion is not a citation and the original units
+belong in the record, because a reader checking against the datasheet will be looking for N·cm.
+
+Rejected: a single `typical` value alongside the range. It would be read as the answer, the range
+would become decoration, and the vendor does not publish one — inventing a midpoint would be a
+number with no source sitting between two that have one.

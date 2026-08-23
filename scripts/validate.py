@@ -398,6 +398,24 @@ def check_actuator(path: Path, report: Report) -> str | None:
                 "describe a gearbox that is TURNING. What governs a stationary geartrain "
                 "is starting and backdriving torque, which are different quantities "
                 "(ADR-0018)")
+    # ADR-0021: ranges whose two ends answer opposite questions.
+    for field in ("starting_torque_nm", "backdriving_torque_nm"):
+        rng = gearbox.get(field)
+        if not rng:
+            continue
+        lo, hi = rng.get("min"), rng.get("max")
+        if lo is not None and hi is not None and lo > hi:
+            report.fail(where, f"gearbox.{field} has min {lo} above max {hi}")
+        elif lo is not None and hi is not None and lo == hi:
+            report.warn(
+                where,
+                f"gearbox.{field} has min == max, which is a value wearing a range. "
+                f"If the vendor really publishes one figure, say so in how_determined "
+                f"— unit-to-unit variation is the reason this field is a range "
+                f"(ADR-0021)")
+        if not (rng.get("how_determined") or "").strip():
+            report.fail(where, f"gearbox.{field} has no how_determined")
+
     if gearbox.get("spread_pct") is not None and gearbox.get("basis") is None:
         report.warn(where, "gearbox.spread_pct is declared with no basis — a spread is a "
                            "statement about a population, so the basis should say "

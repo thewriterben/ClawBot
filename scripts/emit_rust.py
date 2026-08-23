@@ -345,6 +345,35 @@ impl Robot {
     }
 }
 
+/// A quantity that varies **unit to unit** rather than over an operating
+/// envelope, so it is stored as a range and never collapsed to a value
+/// (ADR-0021).
+///
+/// **The two ends answer opposite questions, and picking one silently is wrong
+/// in a direction that depends on what the caller is asking:**
+///
+/// - *"Can this hold a load unpowered?"* — use `min`. Your unit might be the
+///   loose one, and assuming otherwise means a load that slips.
+/// - *"Will this back-drive when I need it to?"* — for hand-guiding, or a fault
+///   that must not lock a joint — use `max`. Your unit might be the stiff one.
+///
+/// There is deliberately no `typical`: it would be read as the answer, the range
+/// would become decoration, and no vendor publishes one — a midpoint invented
+/// here would be a number with no source sitting between two that have one.
+///
+/// Nothing in this crate derives from these. The tempting inference — that a
+/// load below the backdriving minimum is held with no actuator torque — is a
+/// physical claim this repo has no source for, and its failure mode is a joint
+/// that lets go.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct TorqueRange {
+    pub min: f64,
+    pub max: f64,
+    /// The vendor's method, and the original units where a conversion happened.
+    pub how_determined: &'static str,
+    pub basis: Option<Basis>,
+}
+
 /// Whether a value describes the **product line** or the **unit on your bench**
 /// (ADR-0018).
 ///
@@ -391,6 +420,12 @@ pub struct Actuator {
     /// achieved pose differ.
     pub backlash_rad: Option<Radians>,
     pub mass_g: Option<f64>,
+    /// Input torque required to begin motion. A range, never a value.
+    pub starting_torque_nm: Option<TorqueRange>,
+    /// Output torque required to turn the input — what a stationary geartrain
+    /// resists. A range, and **its two ends answer opposite questions**; see
+    /// [`TorqueRange`].
+    pub backdriving_torque_nm: Option<TorqueRange>,
     /// Whether this actuator's figures describe the product line or your unit.
     /// `None` is unknown, and a derivation consuming it must say so (ADR-0018).
     pub basis: Option<Basis>,
@@ -673,6 +708,15 @@ def render_robot(robot: dict) -> str:
     )
 
 
+def range_rs(rng) -> str:
+    if not rng:
+        return "None"
+    return ("Some(TorqueRange { "
+            f"min: {float(rng['min'])!r}_f64, max: {float(rng['max'])!r}_f64, "
+            f"how_determined: {rs_str(rng['how_determined'])}, "
+            f"basis: {basis_rs(rng.get('basis'))} }})")
+
+
 def basis_rs(value) -> str:
     if value is None:
         return "None"
@@ -706,6 +750,9 @@ def render_actuator(act: dict) -> str:
         + ("None" if backlash is None else f"Some(Radians({float(backlash)!r}_f64))")
         + ",\n"
         f"        mass_g: {rs_f64(act.get('mass_g'))},\n"
+        f"        starting_torque_nm: {range_rs(gearbox.get('starting_torque_nm'))},\n"
+        f"        backdriving_torque_nm: "
+        f"{range_rs(gearbox.get('backdriving_torque_nm'))},\n"
         f"        basis: {basis_rs(gearbox.get('basis') or act.get('basis'))},\n"
         f"        spread_pct: "
         f"{rs_f64(gearbox.get('spread_pct') or act.get('spread_pct'))},\n"

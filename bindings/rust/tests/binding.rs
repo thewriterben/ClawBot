@@ -277,6 +277,41 @@ fn an_undeclared_basis_is_none_and_none_means_unknown() {
 }
 
 #[test]
+fn a_torque_range_is_never_collapsed_to_a_value() {
+    // ADR-0021. There is no `typical`, and the type has no accessor that picks
+    // an end — because which end is right depends on the caller's question:
+    // `min` for "can it hold unpowered", `max` for "will it back-drive".
+    for actuator in ACTUATORS {
+        for range in [actuator.starting_torque_nm, actuator.backdriving_torque_nm]
+            .into_iter()
+            .flatten()
+        {
+            assert!(range.min <= range.max, "{} has an inverted range", actuator.id);
+            assert!(!range.how_determined.is_empty());
+        }
+    }
+}
+
+#[test]
+fn nothing_derives_from_a_torque_range() {
+    // Asserted by construction: `TorqueRange` has no methods at all, so
+    //
+    //     if load < actuator.backdriving_torque_nm.unwrap().min { /* holds! */ }
+    //
+    // is something a caller has to write themselves, in their own code, where a
+    // reviewer sees it. The inference is a physical claim this repo has no
+    // source for, and its failure mode is a joint that lets go.
+    let range = TorqueRange {
+        min: 7.0,
+        max: 190.0,
+        how_determined: "vendor table",
+        basis: Some(Basis::ModelTypical),
+    };
+    assert_eq!(range.min, 7.0);
+    assert_eq!(range.max, 190.0);
+}
+
+#[test]
 fn basis_round_trips_through_its_string() {
     assert_eq!(Basis::ModelTypical.as_str(), "model-typical");
     assert_eq!(Basis::ThisUnit.as_str(), "this-unit");
