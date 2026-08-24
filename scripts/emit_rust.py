@@ -193,6 +193,42 @@ pub struct HoldingTorque {
     pub at_amps: f64,
 }
 
+/// Force a linear actuator produces at the limit, in newtons.
+///
+/// **Newtons are not newton-metres** (ADR-0025). Force and torque are separate
+/// types here so that a unit error is a compile error rather than a number that
+/// looks ordinary. Actuonix calls this "Max Force (lifted)".
+///
+/// **No conversion to [`ContinuousForce`]**, matching [`StallTorque`]. The
+/// Actuonix L12 publishes a 20% maximum duty cycle, which is a vendor saying
+/// its headline force is not a continuous rating.
+///
+/// ```compile_fail
+/// use clawbot::{StallForce, ContinuousForce};
+/// let peak = StallForce { newtons: 80.0, at_volts: 12.0, at_amps: None };
+/// let _sized_on_this: ContinuousForce = peak.into();
+/// ```
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct StallForce {
+    pub newtons: f64,
+    /// Required. The L12 ships in 6 V and 12 V variants with different force
+    /// figures, so a force without its voltage is not a figure.
+    pub at_volts: f64,
+    pub at_amps: Option<f64>,
+}
+
+/// Force a linear actuator can sustain. **The only force that may size a
+/// mechanism** (ADR-0004, ADR-0025).
+///
+/// Expect this slice to be empty. Empty means capacity is not derivable, and is
+/// never a licence to take a fraction of [`StallForce`].
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct ContinuousForce {
+    pub newtons: f64,
+    pub at_volts: f64,
+    pub how_determined: &'static str,
+}
+
 /// Torque an actuator can sustain. **The only torque that may size a mechanism**
 /// (ADR-0004).
 ///
@@ -444,6 +480,14 @@ pub struct Actuator {
     /// Current-indexed headline for steppers and BLDCs (ADR-0023). Empty for a
     /// servo, and empty is not zero.
     pub holding_torque: &'static [HoldingTorque],
+    /// Newtons, for linear actuators only (ADR-0025). Empty for everything that
+    /// produces a torque.
+    pub stall_force: &'static [StallForce],
+    /// The only force that may size a mechanism. Empty on every datasheet read
+    /// so far.
+    pub continuous_force: &'static [ContinuousForce],
+    /// The vendor's stated maximum duty cycle. `None` is UNKNOWN, never 100.
+    pub duty_cycle_pct: Option<f64>,
     pub gear_ratio: Option<f64>,
     /// `None` means UNKNOWN, never zero. Backlash is why a commanded pose and an
     /// achieved pose differ.
@@ -767,6 +811,16 @@ def render_actuator(act: dict) -> str:
         f"            HoldingTorque {{ newton_metres: {float(r['value'])!r}_f64, "
         f"at_amps: {float(r['at_amps'])!r}_f64 }},\n"
         for r in act.get("holding_torque_nm") or [])
+    stall_f = "".join(
+        f"            StallForce {{ newtons: {float(r['value'])!r}_f64, "
+        f"at_volts: {float(r['at_volts'])!r}_f64, "
+        f"at_amps: {rs_f64(r.get('at_amps'))} }},\n"
+        for r in act.get("stall_force_n") or [])
+    cont_f = "".join(
+        f"            ContinuousForce {{ newtons: {float(r['value'])!r}_f64, "
+        f"at_volts: {float(r['at_volts'])!r}_f64, "
+        f"how_determined: {rs_str(r['how_determined'])} }},\n"
+        for r in act.get("continuous_force_n") or [])
     gearbox = act.get("gearbox") or {}
     backlash = gearbox.get("backlash_rad")
     return (
@@ -778,6 +832,9 @@ def render_actuator(act: dict) -> str:
         f"        part_id: {rs(act.get('part_id'))},\n"
         f"        stall_torque: &[\n{stall}        ],\n"
         f"        holding_torque: &[\n{holding}        ],\n"
+        f"        stall_force: &[\n{stall_f}        ],\n"
+        f"        continuous_force: &[\n{cont_f}        ],\n"
+        f"        duty_cycle_pct: {rs_f64(act.get('duty_cycle_pct'))},\n"
         f"        continuous_torque: &[\n{cont}        ],\n"
         f"        gear_ratio: {rs_f64(gearbox.get('ratio'))},\n"
         f"        backlash_rad: "

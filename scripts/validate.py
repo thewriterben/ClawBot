@@ -321,7 +321,8 @@ def check_actuator(path: Path, report: Report) -> str | None:
 
     # Voltage-indexed arrays (ADR-0014). The voltage is the index, not an
     # annotation, so a duplicate or missing one makes the row unlookupable.
-    for field in ("stall_torque_nm", "continuous_torque_nm", "no_load_speed_rad_s"):
+    for field in ("stall_torque_nm", "continuous_torque_nm", "no_load_speed_rad_s",
+                  "stall_force_n", "continuous_force_n"):
         rows = act.get(field)
         if rows is None:
             continue
@@ -373,6 +374,49 @@ def check_actuator(path: Path, report: Report) -> str | None:
                 seen_amps.add(amps)
     holding = holding or []
 
+    # Newtons are not newton-metres (ADR-0025). Unlike the stall/holding mixup
+    # below, which is two conventions for one quantity and is reported, this is a
+    # unit error: it is refused. A linear actuator does not produce a torque and a
+    # rotary one does not produce a force, whatever the mechanism downstream does
+    # with it.
+    LINEAR = "linear-actuator"
+    kind_now = act.get("type")
+    torque_fields = ("stall_torque_nm", "continuous_torque_nm", "holding_torque_nm")
+    force_fields = ("stall_force_n", "continuous_force_n")
+    if kind_now == LINEAR:
+        for f in torque_fields:
+            if act.get(f):
+                report.fail(where, f"type 'linear-actuator' carries {f}. A linear "
+                                   f"actuator's output is a FORCE in newtons, not a "
+                                   f"torque in newton-metres. Use stall_force_n or "
+                                   f"continuous_force_n (ADR-0025)")
+    elif kind_now is not None:
+        for f in force_fields:
+            if act.get(f):
+                report.fail(where, f"type {kind_now!r} carries {f}. Only a "
+                                   f"linear-actuator produces a force; a rotary "
+                                   f"actuator's output is a torque (ADR-0025)")
+
+    # Continuous force obeys the rules continuous torque obeys.
+    stall_f = {r.get("at_volts"): r.get("value")
+               for r in (act.get("stall_force_n") or [])
+               if isinstance(r, dict)}
+    for row in (act.get("continuous_force_n") or []):
+        volts = row.get("at_volts")
+        how = (row.get("how_determined") or "").strip()
+        if not how:
+            report.fail(where, f"continuous_force_n at {volts} V has no "
+                               f"how_determined (ADR-0004, ADR-0025)")
+        elif RULE_OF_THUMB.search(how):
+            report.fail(where, f"continuous_force_n at {volts} V determined by a rule "
+                               f"of thumb; that is a guess wearing a citation")
+        if volts in stall_f and row.get("value", 0) >= stall_f[volts]:
+            report.fail(where, f"continuous_force_n at {volts} V is not less than "
+                               f"stall_force_n at the same voltage")
+    if act.get("stall_force_n") and not act.get("continuous_force_n"):
+        report.warn(where, "stall force only, continuous is null: capacity is "
+                           "underivable and that is the honest answer (ADR-0004)")
+
     # The two headline fields are indexed differently because the actuators are
     # driven differently. Using the wrong one is not a schema error -- both are
     # legal shapes -- so it is reported rather than refused.
@@ -385,8 +429,9 @@ def check_actuator(path: Path, report: Report) -> str | None:
         report.warn(where, f"type '{kind}' with holding_torque_nm: a voltage-driven "
                            f"servo publishes stall torque against voltage. See "
                            f"stall_torque_nm (ADR-0014, ADR-0023)")
-    if not any((act.get("stall_torque_nm"), act.get("continuous_torque_nm"), holding)):
-        report.warn(where, "no torque figure of any kind: this actuator can size nothing, "
+    if not any((act.get("stall_torque_nm"), act.get("continuous_torque_nm"), holding,
+                act.get("stall_force_n"), act.get("continuous_force_n"))):
+        report.warn(where, "no torque or force figure of any kind: this actuator can size nothing, "
                            "and every capacity answer naming it is 'incomplete'. Legitimate "
                            "for a part no datasheet describes (ADR-0024); measuring one is "
                            "what closes it")
