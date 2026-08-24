@@ -108,3 +108,31 @@ jobs:
         env:
           RUSTFLAGS: "-D warnings"
         run: cargo build
+
+      # Every number CLAUDE.md and README.md claim about this repo, checked
+      # against the repo. On 2026-08-23 the counts went stale five times in one
+      # day and every one was caught by a person reading rather than by anything
+      # running -- "seven of eight sourcing topics", "one real actuator record",
+      # "no robot record yet". CLAUDE.md already carries the rule ("do not leave
+      # a status claim standing after the code has moved past it"); this is the
+      # first thing that enforces it.
+      #
+      # The counts are re-derived here rather than taken from the steps above,
+      # because a count parsed out of a log that changed format is a check that
+      # silently stops checking.
+      - name: No status claim has outlived what it described
+        working-directory: ClawBot
+        run: |
+          set -euo pipefail
+          PY=$(python -m pytest tests/ -q 2>/dev/null | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+')
+          RS=$(cd bindings/rust && cargo test 2>&1 \
+               | grep -oE '^test result: ok\. [0-9]+ passed' \
+               | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' \
+               | paste -sd+ - | bc)
+          echo "derived from the suites: ${PY} Python, ${RS} Rust"
+          test -n "$PY" && test -n "$RS" || {
+            echo "Could not derive a test count. That is this step failing, not"
+            echo "the claims -- a checker that cannot count must not pass."
+            exit 1
+          }
+          python scripts/check_claims.py --python-tests "$PY" --rust-tests "$RS"
