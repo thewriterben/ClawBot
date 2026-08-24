@@ -1354,3 +1354,51 @@ The branded record stays. It is a correct account of TowerPro's published figure
 This is the first record in `data/` whose evidence is a caliper rather than a document, and it is *better* evidence than the branded record it replaced. A measurement of the object in hand outranks a datasheet about a different object, which is worth saying plainly because this platform's discipline is usually read as "prefer the published figure."
 
 **What closes the gap:** measuring the stall torque with a lever arm and a scale, with the method written into `how_determined`. That is admissible evidence about this unit and worth more here than any datasheet, because no datasheet describes this part. Until then, `hold` answers `incomplete` and names the joint.
+
+---
+
+## ADR-0025 — Force is not torque, and the schema was rotary-shaped throughout
+
+**Date:** 2026-08-23
+**Status:** accepted
+
+**Context.** `type` accepted `linear-actuator` from the beginning. The word **force** did not occur anywhere in the actuator schema.
+
+This is the same defect ADR-0023 fixed for steppers, and it was found the same way — by the enum sweep that ADR left behind rather than by a part arriving. `travel` already carried `lower_mm` and `upper_mm`, so linear *motion* had been anticipated; the linear *output quantity* had not. Every output field was a torque.
+
+Recording an Actuonix L12 therefore meant writing 80 newtons into `stall_torque_nm`, a field whose unit is newton-metres. Not a rounding error or a convention difference — a **unit error**, in the repository whose first rule is that units are named in the field.
+
+**What the L12 actually publishes**, which is more than a single number and drove the shape here:
+
+| Figure | What it is |
+|---|---|
+| Max Force (lifted) 80 N | what it can move a load with, at the limit |
+| Max Duty Cycle **20%** | the vendor saying that force is not continuous |
+| Back Drive Force (static) 45 N | force to back-drive it unpowered |
+| Max Static Force 200 N | what it can *withstand*, not produce |
+| Peak Power Point 62 N @ 3.2 mm/s | one point on a force–speed curve |
+
+**Options considered.**
+
+1. *Reuse the torque fields and note the unit in prose.* Rejected outright. A note does not travel into a derivation, and 80 in a `_nm` field is indistinguishable from a torque to everything downstream. This is the failure the naming convention exists to prevent.
+2. *One generic `output` field carrying a value and a unit.* Rejected. It moves the unit from the field name into the data, so nothing can be wrong until it is read — the opposite of the arrangement where `Radians` and `Degrees` are distinct types because a wrong one should not compile.
+3. *Model all five published figures now.* Rejected. Two of them — back-drive force and a force–speed curve — have rotary analogues (`gearbox.backdriving_torque_nm` from ADR-0021, `measured_efficiency` from ADR-0018) and deserve to be decided **together with** their rotary counterparts rather than bolted on asymmetrically. Five decisions in one afternoon is five decisions made in a hurry.
+4. *Mirror the torque pair, add the duty cycle, and name the rest.* Accepted.
+
+**Decision.**
+
+- `stall_force_n` and `continuous_force_n`, arrays of voltage-indexed rows, mirroring the torque pair exactly. `at_volts` is required for the reason ADR-0014 gave: the L12 ships in 6 V and 12 V variants whose force figures differ.
+- `continuous_force_n` requires `how_determined` and is the **only** force that may size a mechanism. A fraction of stall force is refused there for the same reason it is refused for torque.
+- **`duty_cycle_pct`** on the actuator itself. `thermal_basis` already carried duty-cycle prose but only *on a continuous row*, so it has nowhere to live when the continuous row is the thing that does not exist. The L12's 20% is a statement about the actuator, and it is the evidence that explains a null. Absent means UNKNOWN, never 100.
+- **Wrong-family fields are REFUSED, not reported.** ADR-0023 chose to report a stepper using `stall_torque_nm`, because stall and holding are two conventions for one quantity and a vendor may yet surprise us. This is different in kind: a linear actuator does not produce a torque, whatever the mechanism downstream does with the force. A units error is refused.
+- `StallForce` and `ContinuousForce` in the Rust binding, with no conversion between them and a `compile_fail` doctest executing that guarantee, matching `StallTorque`.
+
+**What is deliberately still missing, and it is most of the datasheet.** Back-drive force, max static force, the peak-power point, and a linear no-load speed — `no_load_speed_rad_s` is angular, and a linear actuator's is mm/s. Mechanical backlash too: `gearbox.backlash_rad` is radians and the L12's is 0.2 mm.
+
+**So the schema is rotary-shaped throughout, and force was the largest of several mismatches rather than the only one.** That is the finding this ADR most wants to record, because it reframes the others: they are not four unrelated gaps but one assumption, made once, before anything linear existed.
+
+The distinction that makes this ADR worth stopping at: before it, **nothing** about a linear actuator could be written down. After it, the headline can, and what cannot is named in a fixture where the next person will find it. That is a difference in kind, not degree — and it is the line ADR-0023 also stopped at.
+
+**Consequences.** `linear-actuator` leaves the known-gap list in `tests/test_coverage.py`, which is what that list is for. Six new tests cover both refusal directions, the missing voltage, continuous-above-stall, the rule-of-thumb refusal, and the widened "no figure of any kind" warning — which had to be widened, or an L12 would have been reported as having no figure while carrying a perfectly good force.
+
+**No derivation gained anything.** `hold` still computes joint torques and there is still no robot with a prismatic joint. Recording a linear actuator and *deriving* with one are separate problems, and only the first is solved here — exactly as ADR-0023 made a stepper recordable without making its capacity derivable.

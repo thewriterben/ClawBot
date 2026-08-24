@@ -130,6 +130,42 @@ pub struct HoldingTorque {
     pub at_amps: f64,
 }
 
+/// Force a linear actuator produces at the limit, in newtons.
+///
+/// **Newtons are not newton-metres** (ADR-0025). Force and torque are separate
+/// types here so that a unit error is a compile error rather than a number that
+/// looks ordinary. Actuonix calls this "Max Force (lifted)".
+///
+/// **No conversion to [`ContinuousForce`]**, matching [`StallTorque`]. The
+/// Actuonix L12 publishes a 20% maximum duty cycle, which is a vendor saying
+/// its headline force is not a continuous rating.
+///
+/// ```compile_fail
+/// use clawbot::{StallForce, ContinuousForce};
+/// let peak = StallForce { newtons: 80.0, at_volts: 12.0, at_amps: None };
+/// let _sized_on_this: ContinuousForce = peak.into();
+/// ```
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct StallForce {
+    pub newtons: f64,
+    /// Required. The L12 ships in 6 V and 12 V variants with different force
+    /// figures, so a force without its voltage is not a figure.
+    pub at_volts: f64,
+    pub at_amps: Option<f64>,
+}
+
+/// Force a linear actuator can sustain. **The only force that may size a
+/// mechanism** (ADR-0004, ADR-0025).
+///
+/// Expect this slice to be empty. Empty means capacity is not derivable, and is
+/// never a licence to take a fraction of [`StallForce`].
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct ContinuousForce {
+    pub newtons: f64,
+    pub at_volts: f64,
+    pub how_determined: &'static str,
+}
+
 /// Torque an actuator can sustain. **The only torque that may size a mechanism**
 /// (ADR-0004).
 ///
@@ -381,6 +417,14 @@ pub struct Actuator {
     /// Current-indexed headline for steppers and BLDCs (ADR-0023). Empty for a
     /// servo, and empty is not zero.
     pub holding_torque: &'static [HoldingTorque],
+    /// Newtons, for linear actuators only (ADR-0025). Empty for everything that
+    /// produces a torque.
+    pub stall_force: &'static [StallForce],
+    /// The only force that may size a mechanism. Empty on every datasheet read
+    /// so far.
+    pub continuous_force: &'static [ContinuousForce],
+    /// The vendor's stated maximum duty cycle. `None` is UNKNOWN, never 100.
+    pub duty_cycle_pct: Option<f64>,
     pub gear_ratio: Option<f64>,
     /// `None` means UNKNOWN, never zero. Backlash is why a commanded pose and an
     /// achieved pose differ.
@@ -659,6 +703,11 @@ pub const ACTUATORS: &[Actuator] = &[
         ],
         holding_torque: &[
         ],
+        stall_force: &[
+        ],
+        continuous_force: &[
+        ],
+        duty_cycle_pct: None,
         continuous_torque: &[
         ],
         gear_ratio: Some(353.5_f64),
@@ -679,6 +728,11 @@ pub const ACTUATORS: &[Actuator] = &[
         ],
         holding_torque: &[
         ],
+        stall_force: &[
+        ],
+        continuous_force: &[
+        ],
+        duty_cycle_pct: None,
         continuous_torque: &[
         ],
         gear_ratio: None,
@@ -701,6 +755,11 @@ pub const ACTUATORS: &[Actuator] = &[
         ],
         holding_torque: &[
         ],
+        stall_force: &[
+        ],
+        continuous_force: &[
+        ],
+        duty_cycle_pct: None,
         continuous_torque: &[
         ],
         gear_ratio: None,

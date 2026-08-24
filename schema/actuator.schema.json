@@ -102,6 +102,55 @@
       },
       "minItems": 1
     },
+    "stall_force_n": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "The linear-actuator datasheet headline, in NEWTONS (ADR-0025). Actuonix calls it 'Max Force (lifted)'. Recorded because datasheets publish it and omitting the field invites someone to write a force into a torque field, NOT because it is usable: like stall torque it may never reach a capacity derivation (ADR-0004).",
+      "items": {
+        "$ref": "#/$defs/forceAtVolts"
+      },
+      "minItems": 1
+    },
+    "continuous_force_n": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "Force a linear actuator can sustain. The ONLY force that may size a mechanism, exactly as continuous_torque_nm is for rotary ones (ADR-0004, ADR-0025). Expect null: the Actuonix L12 publishes a 20% max duty cycle, which is a vendor saying in as many words that its published forces are not continuous.",
+      "items": {
+        "type": "object",
+        "required": [
+          "value",
+          "at_volts",
+          "how_determined"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "at_volts": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "how_determined": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A fraction of the stall force is not a determination, for the same reason it is not one for torque."
+          },
+          "thermal_basis": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/$defs/source"
+          }
+        }
+      },
+      "minItems": 1
+    },
     "no_load_speed_rad_s": {
       "type": [
         "array",
@@ -280,6 +329,12 @@
       "exclusiveMinimum": 0,
       "description": "An actuator mounted partway along a chain is itself a load on every joint below it."
     },
+    "duty_cycle_pct": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 100,
+      "description": "The vendor's stated maximum duty cycle, as a percentage (ADR-0025). Distinct from thermal_basis, which is prose about how ONE continuous figure was determined and therefore has nowhere to live when there is no continuous row. This is a statement about the actuator itself: the L12's 'Max Duty Cycle 20%' is the vendor explaining why its published forces are not continuous ratings. ABSENT MEANS UNKNOWN, never 100."
+    },
     "source": {
       "$ref": "#/$defs/source"
     },
@@ -402,6 +457,34 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Required, per phase. This is the index a row is looked up by, the way at_volts is for a servo. A holding torque without the current it was measured at is not a figure."
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "forceAtVolts": {
+      "type": "object",
+      "description": "A force figure indexed by voltage, for an actuator whose output is LINEAR (ADR-0025). Force is not torque and newtons are not newton-metres; the two families of field are kept apart so a unit error cannot be written down as an ordinary value.",
+      "required": [
+        "value",
+        "at_volts"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Newtons."
+        },
+        "at_volts": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Required, and the index. The L12 is sold in 6 V and 12 V variants whose force figures differ, so a force without its voltage is not a figure - the same rule ADR-0014 established for torque."
+        },
+        "at_amps": {
+          "type": "number",
+          "exclusiveMinimum": 0
         },
         "source": {
           "$ref": "#/$defs/source"

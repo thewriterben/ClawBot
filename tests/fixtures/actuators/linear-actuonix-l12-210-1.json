@@ -1,0 +1,65 @@
+{
+  "_fixture": [
+    "NOT OWNED HARDWARE. Exercises the linear-actuator type, which before ADR-0025",
+    "could not be recorded at all: the word 'force' did not occur in the schema.",
+    "",
+    "It is still PARTIAL, and the note says exactly which published figures have no",
+    "home. The difference from before is qualitative rather than one of degree - the",
+    "headline figure can now be written down, where previously nothing could."
+  ],
+
+  "schema_version": 0,
+  "actuator_id": "fixture-actuonix-l12-210-1",
+  "make": "Actuonix",
+  "model": "L12-100-210-12-P",
+  "type": "linear-actuator",
+
+  "stall_force_n": [
+    {
+      "value": 80.0,
+      "at_volts": 12.0,
+      "at_amps": 0.246,
+      "source": {
+        "citation": "Actuonix L12 specifications, 210:1 gear ratio at 12 V: 'Max Force (lifted)' 80 N, stall current 246 mA. Recorded as a stall figure because it is what the actuator can move a load with at the limit, not what it can sustain - see duty_cycle_pct.",
+        "url": "https://www.actuonix.com/l12",
+        "retrieved": "2026-08-23"
+      }
+    }
+  ],
+
+  "continuous_force_n": null,
+
+  "duty_cycle_pct": 20,
+
+  "travel": {
+    "lower_mm": 0,
+    "upper_mm": 100
+  },
+
+  "gearbox": {
+    "ratio": 210,
+    "source": {
+      "citation": "Actuonix L12 is sold in 50:1, 100:1 and 210:1 gear ratios; this fixture takes the 210:1, whose published figures are 62 N at 3.2 mm/s peak power point, 6.5 mm/s max no-load speed, 80 N max force lifted and 45 N back drive force.",
+      "url": "https://www.actuonix.com/l12",
+      "retrieved": "2026-08-23"
+    }
+  },
+
+  "electrical": {
+    "nominal_volts": 12.0,
+    "stall_current_a": 0.246,
+    "source": {
+      "citation": "Actuonix L12 general specifications: 12 VDC nominal with a 13.5 V maximum input, stall current 246 mA at 12 V. A 6 VDC variant is sold with different force figures, which is why at_volts is the index.",
+      "url": "https://www.actuonix.com/l12",
+      "retrieved": "2026-08-23"
+    }
+  },
+
+  "source": {
+    "citation": "Actuonix L12 Miniature Linear Motion Series, 100 mm stroke, 210:1, 12 V, potentiometer feedback. Figures read 2026-08-23 from vendor and retailer specification listings, confirmed across two independent searches. The manufacturer's own PDF datasheet could NOT be text-extracted - it uses subset fonts with an unmapped encoding, the third datasheet this session to resist reading for a third distinct reason.",
+    "url": "https://www.actuonix.com/l12",
+    "retrieved": "2026-08-23"
+  },
+
+  "note": "WHY continuous_force_n IS NULL, AND FOR ONCE THE VENDOR SAYS SO. Actuonix publishes 'Max Duty Cycle: 20%'. That is a manufacturer stating in as many words that the published forces are not continuous ratings, which is more than either servo vendor offered. It is recorded in duty_cycle_pct rather than left to prose, because it is the reason a reader should not reach for the 80 N.\n\nFOUR PUBLISHED FIGURES STILL HAVE NO HOME, and naming them is half the point of this fixture:\n\n  Back Drive Force (static) 45 N   - the force needed to back-drive it unpowered.\n                                     ADR-0021 gave rotary actuators\n                                     gearbox.backdriving_torque_nm, as a RANGE. The\n                                     linear equivalent wants the same treatment and\n                                     should get it in the same ADR as the rotary one,\n                                     not bolted on here.\n  Max Static Force 200 N           - what it can WITHSTAND while not moving. A\n                                     structural rating, not an output. No rotary\n                                     analogue exists in this schema either.\n  Peak Power Point 62 N @ 3.2 mm/s - a force paired with a speed, i.e. one point on a\n                                     curve. Same shape as measured_efficiency.\n  Max Speed (no load) 6.5 mm/s     - no_load_speed_rad_s is ANGULAR. A linear\n                                     actuator's no-load speed is mm/s and there is no\n                                     field for it.\n\nAnd mechanical backlash 0.2 mm cannot go in gearbox.backlash_rad for the same reason: that field is radians.\n\nSO THE SCHEMA IS ROTARY-SHAPED THROUGHOUT, and force was the largest of several mismatches rather than the only one. ADR-0025 fixed the headline deliberately and named the rest rather than making five decisions in one afternoon."
+}

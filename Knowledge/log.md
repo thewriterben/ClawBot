@@ -985,3 +985,33 @@ promises what it cannot deliver. It could never have found ADR-0024, where the d
 part in the drawer was not the part on the datasheet. That needed looking at the object, and the
 measurement that hinted at it had already been taken and read the wrong way. Enumerable surfaces
 can be swept; contact with the world cannot be simulated.
+
+## [2026-08-23] decision | The sweep's first close, and it found something bigger than the gap
+
+Source: Actuonix L12 vendor and retailer specification listings. → ADR-0025, [[open-questions]]
+
+The enum sweep flagged `linear-actuator` hours earlier: the word **force** did not occur anywhere
+in the actuator schema, while `type` had accepted the value since the schema was written. This
+closes it — and unlike the four gaps before it, **it was found by the method rather than by a part
+arriving.** That is the sweep doing the job it was added for.
+
+**What the L12 turned out to publish** is five distinct quantities, not one: max force lifted 80 N,
+a 20% max duty cycle, back-drive force 45 N, max static force 200 N, and a peak power point of 62 N
+at 3.2 mm/s. ADR-0025 takes the headline and the duty cycle, and names the rest.
+
+**The duty cycle is the part worth remembering.** `thermal_basis` already carried duty-cycle prose,
+but only on a continuous row — so it had nowhere to live precisely when the continuous row is the
+thing that does not exist. Actuonix stating "20%" is a vendor explaining why its own headline is not
+a continuous rating, which is more than either servo vendor offered, and it is now recorded as data
+rather than left in a note.
+
+**The larger finding.** Four other L12 figures have no home, and the reason is not four separate
+oversights: `no_load_speed_rad_s` is angular, `gearbox.backlash_rad` is radians, back-drive torque is
+rotary, the efficiency curve is rotary. **The schema is rotary-shaped throughout.** Force was the
+largest mismatch, not the only one — one assumption made once, before anything linear existed.
+
+**Where the line was drawn, and why.** Before ADR-0025, nothing about a linear actuator could be
+written down. After it, the headline can, and what cannot is named in a fixture where the next
+person will find it. Difference in kind, not degree — the same place ADR-0023 stopped. Modelling all
+five figures would have meant deciding the rotary counterparts of two of them in the same afternoon,
+asymmetrically, which is how a schema acquires a lopsided half.

@@ -361,7 +361,7 @@ def test_an_actuator_with_no_torque_at_all_is_valid_and_says_so():
            "stall_torque_nm": None, "continuous_torque_nm": None}
     report = run("actuator", doc)
     assert report.failures == []
-    assert warns(report, "no torque figure of any kind")
+    assert warns(report, "no torque or force figure of any kind")
 
 
 def test_having_any_torque_figure_silences_that_warning():
@@ -370,7 +370,65 @@ def test_having_any_torque_figure_silences_that_warning():
     doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
            "stall_torque_nm": [{"value": 2.0, "at_volts": 6.0, "source": SRC}]}
     report = run("actuator", doc)
-    assert not warns(report, "no torque figure of any kind")
+    assert not warns(report, "no torque or force figure of any kind")
+    assert warns(report, "capacity is underivable")
+
+
+# ------------------------------------------- ADR-0025: force is not torque
+
+def test_a_linear_actuator_carrying_a_torque_is_refused():
+    """A unit error, not a convention difference. Newtons are not newton-metres,
+    and this platform is strictest about units."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "linear-actuator",
+           "source": SRC,
+           "stall_torque_nm": [{"value": 2.0, "at_volts": 12.0, "source": SRC}]}
+    assert refuses(run("actuator", doc), "output is a FORCE in newtons")
+
+
+def test_a_rotary_actuator_carrying_a_force_is_refused():
+    """The same rule in the other direction, so neither family can borrow the
+    other's fields."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
+           "stall_force_n": [{"value": 80.0, "at_volts": 12.0, "source": SRC}]}
+    assert refuses(run("actuator", doc), "Only a linear-actuator produces a force")
+
+
+def test_force_without_voltage_is_refused():
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "linear-actuator",
+           "source": SRC,
+           "stall_force_n": [{"value": 80.0, "source": SRC}]}
+    assert refuses(run("actuator", doc), "without its supply voltage")
+
+
+def test_continuous_force_above_stall_force_is_refused():
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "linear-actuator",
+           "source": SRC,
+           "stall_force_n": [{"value": 80.0, "at_volts": 12.0, "source": SRC}],
+           "continuous_force_n": [{"value": 90.0, "at_volts": 12.0,
+                                   "how_determined": "measured, held 30 min",
+                                   "source": SRC}]}
+    assert refuses(run("actuator", doc), "not less than")
+
+
+def test_continuous_force_from_a_rule_of_thumb_is_refused():
+    """The 30-50%-of-stall guess ADR-0004 refuses for torque, refused for force."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "linear-actuator",
+           "source": SRC,
+           "continuous_force_n": [{"value": 30.0, "at_volts": 12.0,
+                                   "how_determined": "rule of thumb, 40% of stall",
+                                   "source": SRC}]}
+    assert refuses(run("actuator", doc), "guess wearing a citation")
+
+
+def test_a_force_figure_silences_the_nothing_at_all_warning():
+    """Guards the widened condition: an L12 has no torque and should not be
+    reported as having no figure at all."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "linear-actuator",
+           "source": SRC,
+           "stall_force_n": [{"value": 80.0, "at_volts": 12.0, "source": SRC}]}
+    report = run("actuator", doc)
+    assert report.failures == []
+    assert not warns(report, "no torque or force figure of any kind")
     assert warns(report, "capacity is underivable")
 
 # ------------------------------------------------------------ ADR-0011: assemblies

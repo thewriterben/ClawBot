@@ -57,11 +57,6 @@ ACTUATOR_GAPS = {
         "current; neither takes a range. ADR-0021 already established that some "
         "torques are published as ranges, for starting and backdriving torque. "
         "This is the same shape arriving on a different field.",
-    "linear-actuator":
-        "SCHEMA GAP, and the plainest one. A linear actuator produces FORCE, and "
-        "the word 'force' does not appear in the actuator schema. `travel` "
-        "already carries lower_mm/upper_mm, so linear motion was anticipated; "
-        "the output quantity was not.",
 }
 
 JOINT_GAPS = {
