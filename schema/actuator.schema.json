@@ -280,6 +280,38 @@
           "$ref": "#/$defs/torqueRange",
           "description": "Output torque required to turn the input - what a stationary geartrain resists. A RANGE, never a value (ADR-0021), and THE TWO ENDS ANSWER OPPOSITE QUESTIONS. 'Can this hold a load unpowered' is answered by the MINIMUM, because your unit might be the loose one. 'Will this back-drive when I need it to, for hand-guiding or a fault that must not lock the joint' is answered by the MAXIMUM, because your unit might be the stiff one. A single figure cannot serve both and picking an end silently is wrong in one direction depending on a question this record does not know the caller is asking. FEEDS NO DERIVATION: the tempting inference - that a load below the backdriving minimum is held with no actuator torque - is a physical claim this repo has no source for, and its failure mode is a joint that lets go."
         },
+        "torque_limit": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "A CEILING on what may be applied to the output, never a torque the actuator can deliver (ADR-0027). Pololu publishes, for the whole 25D family and identically at every ratio, 'the recommended upper limit for continuously applied loads is 4 kg-cm' and an intermittent limit of 8 kg-cm. That it does not change with ratio or power tier is what proves it describes the GEARTRAIN rather than the motor's heating.\n\nIt may never become continuous_torque_nm. 'Do not exceed X' and 'can sustain X' are different claims, and at low ratios the ceiling sits ABOVE the motor's stall torque - 4 kg-cm against 3.9 at 9.7:1 - where treating it as a capacity would promise a torque the motor cannot produce at all.\n\nWhat it CAN do is refuse. A required torque above this ceiling is a sound no, the same asymmetry ADR-0015 rests on: static capacity is sound negative and no combination of it yields a provable yes.",
+          "required": [
+            "continuous_nm",
+            "how_determined"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "continuous_nm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "The vendor's recommended upper limit for a continuously applied load. An upper bound, not an achievable value."
+            },
+            "intermittent_nm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Where the vendor publishes a separate, higher limit for intermittent loads. Must not be below continuous_nm."
+            },
+            "how_determined": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The vendor's own words where they have them, and a how_determined that states nothing is refused (ADR-0026)."
+            },
+            "source": {
+              "$ref": "#/$defs/source"
+            }
+          }
+        },
         "basis": {
           "$ref": "#/$defs/basis"
         },

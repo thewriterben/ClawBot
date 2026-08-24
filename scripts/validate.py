@@ -540,6 +540,36 @@ def check_actuator(path: Path, report: Report) -> str | None:
                 f"these ends mean', which is true. This field says 'they were "
                 f"explained', which would not be (ADR-0021, ADR-0026)")
 
+    # ADR-0027: a ceiling refuses, it never sizes.
+    limit = gearbox.get("torque_limit")
+    if limit:
+        cont_lim = limit.get("continuous_nm")
+        inter = limit.get("intermittent_nm")
+        if cont_lim is not None and inter is not None and inter < cont_lim:
+            report.fail(where, f"gearbox.torque_limit has intermittent_nm {inter} below "
+                               f"continuous_nm {cont_lim}; an intermittent limit that is "
+                               f"lower than the continuous one is not an intermittent limit")
+        how_lim = (limit.get("how_determined") or "").strip()
+        if not how_lim:
+            report.fail(where, "gearbox.torque_limit has no how_determined")
+        elif NON_STATEMENT.match(how_lim):
+            report.fail(where, f"gearbox.torque_limit has a how_determined that states "
+                               f"nothing ({how_lim!r}) (ADR-0026)")
+        # The cross-check that makes this field earn its place today.
+        for row in cont:
+            if cont_lim is not None and row.get("value", 0) > cont_lim:
+                report.fail(
+                    where,
+                    f"continuous_torque_nm at {row.get('at_volts')} V is "
+                    f"{row.get('value')} N.m, above the gearbox's continuous ceiling of "
+                    f"{cont_lim}. The vendor said do not exceed it; recording a "
+                    f"sustained torque above it claims the geartrain tolerates what "
+                    f"its maker said it should not (ADR-0027)")
+        if not cont:
+            report.warn(where, "a gearbox ceiling with no continuous_torque_nm: capacity "
+                               "is still underivable, but a required torque ABOVE the "
+                               "ceiling is a sound refusal (ADR-0015, ADR-0027)")
+
     if gearbox.get("spread_pct") is not None and gearbox.get("basis") is None:
         report.warn(where, "gearbox.spread_pct is declared with no basis — a spread is a "
                            "statement about a population, so the basis should say "
