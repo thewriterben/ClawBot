@@ -958,3 +958,30 @@ evidence than the branded record it replaced, because a measurement of the objec
 a datasheet about a different object. Worth naming, since this wiki's discipline is easy to read as
 "prefer the published figure" — the actual rule is prefer the source that describes the thing you
 have.
+
+## [2026-08-23] lint | Sweeping the type enum, because waiting for parts is not a plan
+
+Sources: STEPPERONLINE / DHM listings for the 17HS19-2004S1; Pololu 34:1 25D MP 12V product page;
+iPower GM4108H-120T listings. → [[open-questions]], `tests/test_coverage.py`
+
+Four schema gaps had been found by hardware arriving — ADR-0014 from a voltage, ADR-0018 from an
+efficiency, ADR-0023 from a current, ADR-0024 from an unbranded case. The first three share a
+shape: **an enum value nothing had ever tried.** That set is finite, so it was measured rather
+than waited on.
+
+`type` has six values and `data/` exercised two. Sweeping the other four against real listings
+found **three more gaps in one sitting** — a gearbox torque limit with no field, a BLDC torque
+published as a range at a current, and no force field at all for a linear actuator. Details on
+[[open-questions]].
+
+**None fixed.** Three schema changes in an afternoon would be three decisions made in a hurry, and
+each wants a properly-read datasheet rather than a product listing. The change is that they are
+visible: a test fails if an enum value is neither exercised nor declared with a reason, and fails
+again if a declaration outlives its gap — a known-gap list that goes stale being the disease it
+treats.
+
+**What the method cannot do, recorded so nobody over-trusts it.** It finds places where the schema
+promises what it cannot deliver. It could never have found ADR-0024, where the defect was that the
+part in the drawer was not the part on the datasheet. That needed looking at the object, and the
+measurement that hinted at it had already been taken and read the wrong way. Enumerable surfaces
+can be swept; contact with the world cannot be simulated.

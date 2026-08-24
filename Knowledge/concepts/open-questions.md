@@ -181,6 +181,41 @@ Two of the eight closed as **refusals** — self-collision needs geometry this r
 and a running efficiency does not describe a stationary geartrain. A topic answered by
 establishing that the thing cannot or should not be done is a topic answered.
 
+### The type enum was swept, and three of six types cannot be recorded — **open**
+
+Added 2026-08-23, after ADR-0023 was found the expensive way: a stepper arrived, and the schema
+turned out to have accepted `stepper` since it was written while no field could hold one. That is
+the fourth gap discovered by a part rather than by review, so the surface was measured instead of
+waited on. `type` has six values; `data/` exercised two.
+
+Sweeping the other four against real listings found **three more gaps in one sitting**:
+
+| Type | Status | What has no home |
+|---|---|---|
+| `stepper` | **closed** by ADR-0023 | — |
+| `dc-gearmotor` | **partial** | Pololu publishes a **gearbox torque limit** — *"the recommended upper limit for continuously applied loads is 4 kg·cm"* — which at 34:1 is *below* the motor's 4.7 kg·cm stall, so it binds. `gearbox` has ratio, type, backlash, efficiency, starting and backdriving torque, and no limit. It must not go in `continuous_torque_nm`: that means torque the actuator can sustain, and a geartrain limit says nothing about the motor's heating. |
+| `bldc` | **open** | The iPower GM4108H-120T publishes *"load torque 1200–1800 g·cm"* at 1.5 A — a **range**, indexed by current. `torqueAtVolts` and `torqueAtAmps` both take a single value. ADR-0021 already met ranges on starting and backdriving torque; this is that shape on a different field. |
+| `linear-actuator` | **open** | A linear actuator produces **force**, and the word does not occur anywhere in the actuator schema. `travel` already carries `lower_mm`/`upper_mm`, so linear *motion* was anticipated and the output quantity was not. |
+
+**None of these is fixed, deliberately.** Each wants its own ADR and at least one properly-read
+datasheet, and three schema changes in one day would be three decisions made in a hurry. What
+changed is that they are now **visible**: `tests/test_coverage.py` fails if an enum value is
+neither exercised nor declared here with a reason, and fails again if a declaration outlives its
+gap. Fixtures live in `tests/fixtures/`, never `data/`, because they are questions put to the
+schema rather than records of owned hardware — and every figure in one is still cited, since a
+fabricated fixture would be invented data with extra steps.
+
+**Joint types are swept the same way** and are a different problem: five of six are unexercised,
+but the schema can express all six. That is a coverage gap, not an expressiveness gap, and the
+pairing is worth noting — `prismatic` has no robot to use it *and* no recordable actuator to drive
+it.
+
+**The honest limit of this method.** It finds gaps where the schema promises something it cannot
+deliver. It cannot find ADR-0024, where the failure was that the servo in the drawer was not the
+servo on the datasheet. No enum sweep reaches that; only looking at the object does.
+
+---
+
 **One of the eight left a claim it could not source, and that claim was closed on 2026-08-23.** The
 gearbox page recorded "backlash has no measurement standard" as trade-press hearsay and said so in
 capitals in the schema. A vendor's own pages supplied the core of it primarily -- see
