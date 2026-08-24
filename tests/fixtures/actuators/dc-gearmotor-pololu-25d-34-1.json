@@ -1,0 +1,73 @@
+{
+  "_fixture": [
+    "NOT OWNED HARDWARE. Exercises the dc-gearmotor type, and finds a gap while doing it.",
+    "",
+    "This one is PARTIAL. The stall figure and the no-load speed fit the existing",
+    "voltage-indexed rows exactly. What has no home is Pololu's third published figure:",
+    "a GEARBOX torque limit of 4 kg-cm, which at this ratio is BELOW the 4.7 kg-cm the",
+    "motor can stall at - so it is the binding constraint on the whole actuator and the",
+    "schema cannot record it. See the note, and Knowledge/concepts/open-questions.md."
+  ],
+
+  "schema_version": 0,
+  "actuator_id": "fixture-pololu-25d-34-1",
+  "make": "Pololu",
+  "model": "34:1 Metal Gearmotor 25Dx52L mm MP 12V",
+  "type": "dc-gearmotor",
+
+  "stall_torque_nm": [
+    {
+      "value": 0.46091255,
+      "at_volts": 12.0,
+      "at_amps": 1.8,
+      "source": {
+        "citation": "Pololu product page for the 34:1 25D MP 12V gearmotor: 4.7 kg-cm stall torque, 1.8 A stall current at 12 V. Converted at 1 kgf-cm = 0.0980665 N-m exactly, so 4.7 x 0.0980665 = 0.46091255. The source figure carries two significant figures.",
+        "url": "https://www.pololu.com/product-info-merged/3228",
+        "retrieved": "2026-08-23"
+      }
+    }
+  ],
+
+  "continuous_torque_nm": null,
+
+  "no_load_speed_rad_s": [
+    {
+      "value": 24.08554367752175,
+      "at_volts": 12.0,
+      "at_amps": 0.08,
+      "source": {
+        "citation": "Same page: 230 RPM no-load speed and 80 mA free-run current at 12 V. 230 rev/min x 2pi / 60 = 24.08554367752175 rad/s. Unlike the MG90S, this figure IS labelled no-load by the vendor, so it belongs in this field.",
+        "url": "https://www.pololu.com/product-info-merged/3228",
+        "retrieved": "2026-08-23"
+      }
+    }
+  ],
+
+  "gearbox": {
+    "ratio": 34,
+    "source": {
+      "citation": "Published as '34:1'. Recorded as the nominal published ratio; Pololu documents exact ratios for some gearboxes in its datasheet, which was not read here.",
+      "url": "https://www.pololu.com/category/115/25d-metal-gearmotors",
+      "retrieved": "2026-08-23"
+    }
+  },
+
+  "electrical": {
+    "nominal_volts": 12.0,
+    "stall_current_a": 1.8,
+    "no_load_current_a": 0.08,
+    "source": {
+      "citation": "Pololu 12V Medium-Power 25D specifications: stall current 1.8 A, typical free-run current 100 mA for the family; this variant's page gives 80 mA.",
+      "url": "https://www.pololu.com/product-info-merged/3228",
+      "retrieved": "2026-08-23"
+    }
+  },
+
+  "source": {
+    "citation": "Pololu 34:1 Metal Gearmotor 25Dx52L mm MP 12V, product page specifications, read 2026-08-23 while sweeping the actuator type enum for coverage. Figures come from the product page; Pololu's 5 MB family datasheet with per-version performance graphs was not read.",
+    "url": "https://www.pololu.com/product-info-merged/3228",
+    "retrieved": "2026-08-23"
+  },
+
+  "note": "THE GAP THIS FIXTURE EXISTS TO EXPOSE. Pololu publishes, for the 25D family: 'the recommended upper limit for continuously applied loads is 4 kg-cm (55 oz-in)', with an intermittent limit of 8 kg-cm. That is a GEARBOX limit - a property of the geartrain, not a thermal rating of the motor - and 4 kg-cm is 0.392266 N-m.\n\nAt this 34:1 ratio the motor stalls at 4.7 kg-cm, ABOVE the gearbox's 4 kg-cm limit. So the binding constraint on what this actuator may be asked to hold is the gearbox, and there is no field for it: `gearbox` carries ratio, type, backlash_rad, measured_efficiency, starting_torque_nm, backdriving_torque_nm, basis and spread_pct, and no torque limit.\n\nIt must NOT be written into continuous_torque_nm. That field means torque the actuator can sustain, and this figure says nothing about the motor's thermal behaviour - at a low enough ratio the gearbox limit is not binding at all and the motor's own heating decides. Two different quantities, and conflating them is the ADR-0004 failure in a new costume.\n\nSo continuous_torque_nm stays null and capacity stays underivable, while a published, useful, binding number sits in this note because nothing can hold it. Recorded as an open question rather than fixed here."
+}

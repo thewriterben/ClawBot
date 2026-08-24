@@ -1,0 +1,47 @@
+{
+  "_fixture": [
+    "NOT OWNED HARDWARE, and not in data/ for that reason. This exists to answer one",
+    "question: can the schema hold a stepper honestly? Since ADR-0023, yes.",
+    "",
+    "Every figure is cited from a real listing. A fabricated fixture would be invented",
+    "data with extra steps, and would prove nothing about a schema meeting reality."
+  ],
+
+  "schema_version": 0,
+  "actuator_id": "fixture-17hs19-2004s1",
+  "make": "STEPPERONLINE",
+  "model": "17HS19-2004S1",
+  "type": "stepper",
+
+  "stall_torque_nm": null,
+  "continuous_torque_nm": null,
+
+  "holding_torque_nm": [
+    {
+      "value": 0.59,
+      "at_amps": 2.0,
+      "source": {
+        "citation": "STEPPERONLINE 17HS19-2004S1 General Specification: 'Holding Torque: 59Ncm(83.55oz.in)', 'Rated Current/phase: 2.0A'. 59 Ncm = 0.59 N-m exactly. Indexed by current, never by the listing's 'Voltage: 2.8V', which is the product of rated current and the published 1.4 ohm phase resistance (ADR-0023).",
+        "url": "https://www.dhm-online.com/en/nema-17/10127-17hs19-2004s1-20a-18-stepper-motor-stepperonline-nema-17-cnc-3d-print.html",
+        "retrieved": "2026-08-23"
+      }
+    }
+  ],
+
+  "electrical": {
+    "nominal_volts": 2.8,
+    "source": {
+      "citation": "STEPPERONLINE lists 'Voltage: 2.8V', which is rated current x phase resistance (2.0 A x 1.4 ohm). Recorded here because electrical is where a voltage belongs, and NOT on the torque row - a chopper drive supplies far more than this. A second retailer omits the figure entirely.",
+      "url": "https://www.dhm-online.com/en/nema-17/10127-17hs19-2004s1-20a-18-stepper-motor-stepperonline-nema-17-cnc-3d-print.html",
+      "retrieved": "2026-08-23"
+    }
+  },
+
+  "source": {
+    "citation": "STEPPERONLINE 17HS19-2004S1, NEMA 17 bipolar, 42 x 48 mm, 1.8 deg step angle, 4 leads. Read 2026-08-23 for ADR-0023. The manufacturer's own PDF datasheet could NOT be read: it is published as a vectorised drawing with zero text operators, so these figures come from product listings.",
+    "url": "https://www.dhm-online.com/en/nema-17/10127-17hs19-2004s1-20a-18-stepper-motor-stepperonline-nema-17-cnc-3d-print.html",
+    "retrieved": "2026-08-23"
+  },
+
+  "note": "continuous_torque_nm is null and stall_torque_nm is null, which are two different statements. Stall is null because a stepper does not publish one - it is not a term the datasheet uses. Continuous is null because neither listing gives a thermal or duty rating. So capacity is underivable, the same answer the XM430 and the MG90S get, for a third distinct reason.\n\nThat is NOT a claim that a stepper cannot be run continuously at rated current. It commonly is. There is simply no source here for the conditions, and ADR-0023 left the question open rather than settling it by inference."
+}
