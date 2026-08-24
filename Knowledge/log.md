@@ -1081,3 +1081,29 @@ afternoon, one was real and fixed ([[stepper-torque-index]] had already closed a
 mislabelled datasheet problem, and one was a reason that turned out to be wrong. **Two of three
 entries needed correcting** - which is the rate to expect from a list whose reasons nothing checks,
 and worth remembering the next time one reads convincingly.
+
+## [2026-08-24] finding | The template's central promise was never implemented
+
+Source: the code. -> ADR-0028
+
+`example/robot.template.json` has always said *"if you leave a placeholder in, downstream answers
+are supposed to fail loudly"*, and the invariant promises a `TODO(source)` *"that fails loudly until
+a real source arrives"*. Neither was true: `grep TODO(source) scripts/` matched `validate.py` alone.
+`fk` over the pan-tilt returned a tool position of **2.0 mm** - the sum of two `z: 1` stand-ins -
+formatted exactly like a fact.
+
+**Why it hid.** `data/` held no robot record until 2026-08-23, so no derivation had ever run over a
+record containing placeholders. Not subtle; nothing had been in a position to notice.
+
+**The interesting decision was how to gate, not whether.** ADR-0003 established that assumptions
+travel inside an answer rather than causing a refusal, and by that precedent `fk` could have
+returned its 2.0 mm with the placeholders listed alongside. Rejected: an assumption is a condition
+under which an answer is true, and a placeholder has no such conditions. Dressing a wrong number in
+the clothes ADR-0003 reserves for a true one is worse than refusing.
+
+**The caution, and it is the third time in two days.** Two gates were added on 2026-08-23 to catch
+this class of problem and **neither could have found this one.** The coverage sweep asks whether a
+type is recordable, never whether a derivation honours what the docs promise. `check_claims` compares
+counts to reality, not behaviour to prose. Nothing here verifies that the code does what the writing
+says it does, that gap is probably not closable in general, and the working response is to keep
+reading this repo's documentation as a claim rather than a description.

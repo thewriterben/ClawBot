@@ -70,6 +70,49 @@ NON_STATEMENT = re.compile(
 )
 
 
+PLACEHOLDER = "TODO(source)"
+
+
+def cites_placeholder(source) -> bool:
+    """True when a source exists but its citation is still the placeholder."""
+    return ((source or {}).get("citation") or "").strip().startswith(PLACEHOLDER)
+
+
+def consumed_placeholders(robot: dict, scopes) -> list[str]:
+    """Which parts of a robot record a derivation reads, that nobody has sourced.
+
+    Lives here because this module owns the citation gate, and a rule copied into
+    four scripts drifts in its wording before it drifts in its logic.
+
+    `scopes` names what a given derivation actually consumes, so a placeholder on
+    something it never reads does not refuse it.
+    """
+    found = []
+    if "joints" in scopes:
+        found += [f"joint '{j.get('joint_id')}'" for j in robot.get("joints") or []
+                  if cites_placeholder(j.get("source"))]
+    if "links" in scopes:
+        found += [f"link '{l.get('link_id')}'" for l in robot.get("links") or []
+                  if cites_placeholder(l.get("source"))]
+    if "tool" in scopes:
+        tool = robot.get("tool")
+        if tool and cites_placeholder(tool.get("source")):
+            found.append("tool")
+    return found
+
+
+def placeholder_detail(found: list[str]) -> str:
+    """The refusal text, which has to say why a caveat would not have done."""
+    return (
+        f"cites {PLACEHOLDER} - {', '.join(found)}. A placeholder is not an "
+        f"assumption an answer can carry inside it. An assumption is true under "
+        f"stated conditions; a placeholder is a number nobody sourced, so a "
+        f"result computed from one is WRONG rather than provisional, and there "
+        f"are no conditions under which it holds. Replace it, or take the "
+        f"refusal (ADR-0028)."
+    )
+
+
 class Report:
     """Failures block; warnings are findings a human should look at."""
 

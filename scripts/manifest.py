@@ -38,6 +38,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+import validate   # the citation gate lives there; ADR-0028 reuses it
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -47,6 +49,14 @@ def load(directory: str, entry_id: str, key: str) -> dict | None:
         if doc.get(key) == entry_id:
             return doc
     return None
+
+
+def placeholder_refusals(robot: dict) -> list[str]:
+    """ADR-0028: a manifest lists parts to fabricate, so a placeholder size is a
+    thing somebody would print. Reported rather than raised, because this module
+    already collects its problems into the document it returns."""
+    found = validate.consumed_placeholders(robot, ("links", "joints"))
+    return [validate.placeholder_detail(found)] if found else []
 
 
 def build_manifest(robot: dict, assembly: dict | None, harness: dict | None) -> dict:
@@ -265,6 +275,14 @@ def render(manifest: dict, robot: dict) -> str:
 
     unlimited = [j["joint_id"] for j in robot.get("joints", [])
                  if j.get("type") in ("revolute", "prismatic") and not j.get("limits")]
+    placeheld = placeholder_refusals(robot)
+    if placeheld:
+        out.append("")
+        out.append("  PLACEHOLDER SIZES — this bill of parts is not printable.")
+        out.append(f"  {placeheld[0]}")
+        out.append("  `--as-project` refuses outright, because that document routes to "
+                   "a machine.")
+
     if unlimited:
         out.append(f"  Note: {len(unlimited)} joint(s) have no limits "
                    f"({', '.join(unlimited)}).")
@@ -302,6 +320,15 @@ def main() -> int:
     manifest = build_manifest(robot, assembly, harness)
 
     if args.as_project:
+        # ADR-0028. This document routes to a machine. A `make` requirement whose
+        # size_mm is a placeholder is a part somebody prints, so this path refuses
+        # where `render` only warns - the same distinction ADR-0019 draws about
+        # emitting a fabrication-bound document the record does not support.
+        placeheld = placeholder_refusals(robot)
+        if placeheld:
+            print(f"REFUSED: cannot emit an OpenBuildCore project for "
+                  f"'{args.robot_id}'.\n\n  {placeheld[0]}", file=sys.stderr)
+            return 1
         try:
             notes = check_policy(robot)
         except PolicyRefusal as exc:

@@ -7,7 +7,7 @@ what it did; a known-answer test tells you it does the right thing. A 1 kg mass 
 a 100 mm arm loads the joint with 0.980665 N.m because g is 9.80665 m/s^2, and
 that is true whether or not this code has ever run.
 
-    python tests/test_kinematics.py
+    python tests/test_kin.py
 """
 from __future__ import annotations
 
@@ -403,3 +403,75 @@ if __name__ == "__main__":
             print(f"FAIL  {name} — {exc}")
     print(f"\n{len(tests) - failed}/{len(tests)} passed")
     sys.exit(1 if failed else 0)
+
+
+# ------------------------------------------ ADR-0028: placeholders do not compute
+
+REAL_SRC = {"citation": "measured, digital caliper 0.01 mm"}
+TODO_SRC = {"citation": "TODO(source)"}
+
+
+def _two_joint_robot(joint_src, link_src=REAL_SRC, tool=None):
+    """A minimal tree. Only the citations vary between cases."""
+    return {
+        "schema_version": 0, "robot_id": "r", "kind": "pan-tilt",
+        "base_link": "base", "source": REAL_SRC,
+        "links": [{"link_id": lid, "make": {"size_mm": {"x": 10, "y": 10, "z": 10},
+                                            "material": "petg"},
+                   "source": link_src} for lid in ("base", "arm")],
+        "joints": [{"joint_id": "j", "type": "revolute", "parent": "base",
+                    "child": "arm",
+                    "origin": {"xyz_mm": {"x": 0, "y": 0, "z": 50}},
+                    "axis": {"x": 0, "y": 0, "z": 1},
+                    "limits": {"lower_rad": -1, "upper_rad": 1, "source": REAL_SRC},
+                    "source": joint_src}],
+        "tool": tool,
+    }
+
+
+def test_fk_refuses_over_a_placeholder_joint():
+    """The defect this ADR exists for. fk used to return the sum of the
+    placeholders, formatted exactly like a fact."""
+    robot = _two_joint_robot(TODO_SRC)
+    try:
+        kin.forward_kinematics(robot, {})
+    except kin.Incomplete as exc:
+        assert "j" in exc.missing
+        assert "TODO(source)" in exc.detail
+    else:
+        raise AssertionError("fk computed a pose from an unsourced origin")
+
+
+def test_fk_computes_when_every_source_is_real():
+    """Guards the gate itself: a refusal that fires on everything is not a gate."""
+    frames = kin.forward_kinematics(_two_joint_robot(REAL_SRC), {})
+    assert kin.position(frames["arm"])[2] == 50
+
+
+def test_a_placeholder_on_something_unread_does_not_refuse():
+    """Scope matters. fk reads joint origins, not link provenance, so a
+    placeholder on a link must not refuse a computation that never touches it."""
+    robot = _two_joint_robot(REAL_SRC, link_src=TODO_SRC)
+    frames = kin.forward_kinematics(robot, {})
+    assert kin.position(frames["arm"])[2] == 50
+
+
+def test_hold_reads_links_so_a_placeholder_link_does_refuse():
+    """The same link, for a derivation that does consume its mass."""
+    robot = _two_joint_robot(REAL_SRC, link_src=TODO_SRC)
+    verdict = kin.hold_verdict(robot, {}, 0.0)
+    assert verdict["verdict"] == "incomplete"
+    assert "link" in verdict["missing"]
+
+
+def test_reach_refuses_over_a_placeholder():
+    verdict = kin.reach_verdict(_two_joint_robot(TODO_SRC), None, 5.0, 32, 1)
+    assert verdict["verdict"] == "incomplete"
+    assert "TODO(source)" in verdict["detail"]
+
+
+def test_the_refusal_says_why_a_caveat_would_not_do():
+    """The wording is load-bearing: ADR-0003 lets assumptions ride inside an
+    answer, and this explains why a placeholder is not one of those."""
+    verdict = kin.reach_verdict(_two_joint_robot(TODO_SRC), None, 5.0, 32, 1)
+    assert "wrong rather than provisional" in verdict["detail"].lower()
