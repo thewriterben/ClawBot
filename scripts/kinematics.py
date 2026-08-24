@@ -32,6 +32,8 @@ import random
 import sys
 from pathlib import Path
 
+import validate   # the citation gate lives there; ADR-0028 reuses it
+
 ROOT = Path(__file__).resolve().parent.parent
 G = 9.80665                     # m/s^2, standard gravity
 MM_PER_M = 1000.0
@@ -176,8 +178,21 @@ def joint_transform(joint: dict, value: float):
     raise Incomplete(f"joint '{joint['joint_id']}'", f"unknown type '{jtype}'")
 
 
+def refuse_on_placeholder(robot: dict, *scopes: str) -> None:
+    """ADR-0028. The template promised this and nothing delivered it.
+
+    Until `data/` held a robot, no derivation had ever run over a record with
+    placeholders in it - so `fk` returning a tool position of 2.0 mm, the sum
+    of two `z: 1` stand-ins formatted exactly like a fact, went unnoticed.
+    """
+    found = validate.consumed_placeholders(robot, scopes)
+    if found:
+        raise Incomplete(", ".join(found), validate.placeholder_detail(found))
+
+
 def forward_kinematics(robot: dict, pose: dict) -> dict:
     """link_id -> 4x4 pose in the base frame. Every frame here is base-relative."""
+    refuse_on_placeholder(robot, "joints")
     pose = resolve_pose(robot, pose)
     frames = {robot["base_link"]: IDENTITY}
     joints = list(robot.get("joints", []))
@@ -306,6 +321,7 @@ def reach_verdict(robot: dict, target, tolerance_mm: float,
         "tool_offset": tool_offset_description(robot),
     }
     try:
+        refuse_on_placeholder(robot, "joints", "tool")
         points = sample_workspace(robot, samples, seed)
     except Incomplete as exc:
         return dict(base, verdict="incomplete", missing=exc.missing, detail=exc.detail)
@@ -438,6 +454,7 @@ def hold_verdict(robot: dict, pose: dict, payload_g: float) -> dict:
 
     gravity = (0.0, 0.0, -1.0)                # base frame, z up per REP-103
     try:
+        refuse_on_placeholder(robot, "joints", "links", "tool")
         frames = forward_kinematics(robot, pose)
     except Incomplete as exc:
         return dict(base, verdict="incomplete", missing=exc.missing, detail=exc.detail)
@@ -607,6 +624,7 @@ def main() -> int:
 
     if args.command == "fk":
         try:
+            refuse_on_placeholder(robot, "joints", "tool")
             frames = forward_kinematics(robot, parse_pose(args.pose))
         except Incomplete as exc:
             print(json.dumps({"verdict": "incomplete", "missing": exc.missing,

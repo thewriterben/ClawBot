@@ -29,6 +29,8 @@ millimetres (ADR-0005). Stdlib only.
 """
 from __future__ import annotations
 
+import validate   # the citation gate lives there; ADR-0028 reuses it
+
 import argparse
 import json
 import re
@@ -214,6 +216,13 @@ def import_urdf(path: Path, robot_id: str | None) -> tuple[dict, list]:
 def export_urdf(robot: dict) -> tuple[str | None, list]:
     """Returns (xml, refusals). A non-empty refusal list means no document."""
     refusals = []
+
+    # ADR-0028. A URDF is the most quotable form this repo emits — it goes into
+    # a simulator and comes back as a screenshot — so a placeholder reaching one
+    # would travel further than any other wrong number here.
+    placeheld = validate.consumed_placeholders(robot, ("joints", "links", "tool"))
+    if placeheld:
+        refusals.append(validate.placeholder_detail(placeheld))
     for joint in robot.get("joints", []):
         jid, jtype = joint["joint_id"], joint.get("type")
         if jtype not in NEEDS_LIMIT:

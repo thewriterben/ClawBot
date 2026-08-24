@@ -40,6 +40,7 @@ These are decided. If a change would introduce one, it needs a superseding ADR, 
 | A running efficiency applied to a static hold | Efficiency curves are indexed by input speed; a held pose has none. Wrong in kind, not in value | ADR-0018 |
 | Treating a catalogue figure as a fact about your unit | A vendor may be publishing a population average — ±30% unit-to-unit is stated in one datasheet | ADR-0018 |
 | Borrowing a branded part's figures for an unbranded clone | `basis` separates a population from a member; a clone is not a member of it, so there is no population it is typical of | ADR-0024 |
+| Computing over a `TODO(source)` placeholder | A placeholder is not an assumption a caveat can carry: there are no conditions under which it is right | ADR-0028 |
 | Turning a gearbox ceiling into a capacity | 'Do not exceed X' and 'can sustain X' are different claims, and at 9.7:1 the ceiling sits above the motor's own stall torque | ADR-0027 |
 | Storing a range whose ends the vendor never explained | `torqueRange` asserts unit-to-unit variation; a source that says nothing has not claimed that, and absent means UNKNOWN | ADR-0026 |
 | A `how_determined` that states nothing | A required field can always be satisfied with a word, and the record then *looks* explained | ADR-0026 |
@@ -73,10 +74,10 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 
 ## Status
 
-Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty-seven ADRs, seven stdlib
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty-eight ADRs, seven stdlib
 scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`, `emit_rust`,
 `check_claims`), an MCP
-surface and a zero-dependency Rust binding. 185 Python tests, 37 Rust tests, all run by CI. `data/` holds two
+surface and a zero-dependency Rust binding. 191 Python tests, 37 Rust tests, all run by CI. `data/` holds two
 real actuator records and one robot record — a two-DOF pan-tilt, written BEFORE the build so
 `validate.py` is the checklist rather than the audit. Its structure and actuator wiring are real;
 every dimension is a `TODO(source)` placeholder and both joints have `limits: null`, so `reach`,

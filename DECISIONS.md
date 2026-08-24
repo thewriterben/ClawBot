@@ -1480,3 +1480,43 @@ So a ceiling can sit above what is achievable, below it, or anywhere between, an
 **Consequences.** The 25D fixture stops complaining in prose about a figure with nowhere to go. `continuous_torque_nm` there is still null and capacity still underivable, because the real continuous torque is `min(gearbox ceiling, unpublished thermal limit)` and only one of those is known - which the record now says in fields rather than in a note.
 
 `dc-gearmotor` was the last entry on the coverage sweep's gap list. It is empty.
+
+---
+
+## ADR-0028 - A placeholder refuses a derivation; it is not an assumption an answer can carry
+
+**Date:** 2026-08-24
+**Status:** accepted
+
+**Context.** `example/robot.template.json` has said, since it was written:
+
+> If you leave a placeholder in, downstream answers are supposed to fail loudly.
+
+And this repo's central invariant promises a ``TODO(source)`` placeholder *"that fails loudly until a real source arrives."*
+
+**Neither was true.** `grep TODO(source) scripts/` matched only `validate.py`. No derivation checked for one. Running `fk` over the pan-tilt returned:
+
+```json
+"tool_mm": [0.0, 0.0, 2.0]
+```
+
+Two millimetres - the sum of two `z: 1` stand-ins - formatted exactly like a fact, with no caveat field, no mention of a placeholder, nothing. `reach` looked like it refused, but it was refusing on missing *limits*; supply those and it would have sampled a workspace from placeholder link lengths and reported it as a sampled extent.
+
+**Why it stayed hidden for so long**, which is the part worth keeping. `data/` held no robot record until 2026-08-23, so no derivation had ever *run* over a record containing placeholders. The gap was not subtle; nothing had been in a position to notice it. The coverage sweep could not see it either - that asks whether a type is *recordable*, never whether a derivation honours what the documentation promises about it. Nor could `check_claims.py`, which compares counts to reality and not behaviour to prose.
+
+**The decision that actually needed making** is not *whether* to gate but *how*, because this repo has a strong precedent pulling the other way. ADR-0003 established that **the assumptions that make an answer true travel inside the answer** - `reach` returns `frame_note`, `tool_offset` and a sampled-extent caveat rather than refusing. By that pattern, `fk` might have returned its 2.0 mm with a `placeholders: [...]` field attached.
+
+**Rejected, and the distinction is the whole ADR.** An *assumption* is a condition under which the answer is true: state it, and the reader can decide whether it holds. A *placeholder* is a number nobody sourced. There are no conditions under which 2.0 mm is the right answer, so there is nothing for a caveat to say. Carrying it inside the result would dress a wrong number in the same clothes ADR-0003 reserves for a true one - and the wording of the refusal says so, because that is the thing a future reader will be tempted to undo.
+
+**Decision.** A derivation refuses when a value it *consumes* still cites `TODO(source)`, and names what.
+
+- The predicate lives in `validate.py`, which already owns the citation gate. Four copies of one rule drift in their wording before they drift in their logic.
+- **Scoped to what each derivation reads.** `fk` reads joint origins, so a placeholder on a link's provenance does not refuse it; `hold` reads link masses, so the same placeholder does. A gate that fires on everything is not a gate, and there is a test for each direction.
+- `manifest --as-project` **refuses outright** where `render` only warns. That document routes to a machine, and a `make` requirement whose `size_mm` is a placeholder is a part somebody prints - the distinction ADR-0019 already draws about emitting a fabrication-bound document the record does not support.
+- URDF export refuses, listing the placeholder alongside the missing limits it already reported. A URDF is the most quotable thing this repo emits: it goes into a simulator and comes back as a screenshot.
+
+**What does not change.** `validate.py` still *warns* rather than fails. A record full of placeholders is legitimately in progress - that is the record-before-the-build discipline working, and it is how `validate` came to be the build checklist. The refusal belongs at derivation time, where a number would otherwise escape.
+
+**Consequences.** The pan-tilt now refuses from `fk`, `reach`, `affordance`, `urdf export` and `manifest --as-project`, each naming the joints or links responsible, each exiting 1. Six tests cover both directions of the scoping rule and pin the wording that explains why a caveat would not have done.
+
+**And a caution about this repo's own tooling, which is the third time in two days it has been worth writing down.** Two gates were added on 2026-08-23 to catch exactly this class of problem, and neither could have found this. The coverage sweep checks recordability, not behaviour. `check_claims` checks counts, not conduct. **Nothing here verifies that the code does what the prose says it does** - that gap is still open, it is probably not closable in general, and the honest response is to keep reading the documentation as a claim rather than a description.
