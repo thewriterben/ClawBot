@@ -1402,3 +1402,41 @@ The distinction that makes this ADR worth stopping at: before it, **nothing** ab
 **Consequences.** `linear-actuator` leaves the known-gap list in `tests/test_coverage.py`, which is what that list is for. Six new tests cover both refusal directions, the missing voltage, continuous-above-stall, the rule-of-thumb refusal, and the widened "no figure of any kind" warning — which had to be widened, or an L12 would have been reported as having no figure while carrying a perfectly good force.
 
 **No derivation gained anything.** `hold` still computes joint torques and there is still no robot with a prismatic joint. Recording a linear actuator and *deriving* with one are separate problems, and only the first is solved here — exactly as ADR-0023 made a stepper recordable without making its capacity derivable.
+
+---
+
+## ADR-0026 — A range whose ends the vendor never explained may not be stored as one that was
+
+**Date:** 2026-08-23
+**Status:** accepted
+
+**Context.** The coverage sweep added earlier today declared `bldc` a schema gap: the iPower GM4108H-120T publishes *"Load torque(g·cm): 1200-1800"* at *"Load current: 1.5A"*, a range indexed by current, and no field took a range with a current index.
+
+**That reason was wrong, and finding out why is most of this ADR.** ADR-0023's `holding_torque_nm` accepts a current-indexed torque and names `bldc` explicitly. The type was recordable all along. What is not recordable is **this vendor's particular figure**, and the obstacle is not its index — it is that nobody said what the two ends mean.
+
+**Why this is not ADR-0021's range.** `torqueRange` exists, and its description is specific: *"A quantity that varies UNIT TO UNIT rather than over an operating envelope."* It requires `how_determined`, and it got that requirement because Harmonic Drive **stated a method** — *"based on actual tests with the component sets assembled in their housings, and inclusive of friction resistance of oil seals, and churning of oil."*
+
+iPower states nothing. Putting 1200–1800 into `torqueRange` would make the schema assert unit-to-unit variation on a source that never claimed it.
+
+**The notation is the only evidence, and it is deliberately not pushed further than it goes.** One page uses three notations — `124±0.5g`, `11.1Ω±5%` and `0.07±0.1A` for tolerances; `513~567` for the no-load speed span; a plain hyphen for `1200-1800` — and explains none of them. A vendor who has a tolerance notation and did not use it here is not obviously stating a tolerance. **That is enough to refuse a collapse and not enough to say what the range is**, and the second half matters as much as the first.
+
+(The same page gives a no-load current of `0.07±0.1A`, a tolerance wider than the value, which admits a negative current. It is not evidence about the torque range; it is a reason to read the whole table slowly.)
+
+**Options considered.**
+
+1. *Take the minimum, as the conservative end.* Rejected. Conservative requires knowing which direction is conservative. If the span were an operating band rather than a unit spread, the minimum belongs to a condition you may not be in — and ADR-0021 already refused collapsing a range to a value.
+2. *Store it in `torqueRange` with `how_determined: "not stated"`.* Rejected, and it is the tempting one. A required field can always be satisfied with a word. `"not stated"` passes a presence check while carrying exactly the information that leaving the record out would carry — and the record would then *look* explained.
+3. *Add a third range type for unexplained spans.* Rejected. A field for figures nobody understands is a place to put them, and things put somewhere get read.
+4. *Record it as absent, with the published span in `note`.* Accepted.
+
+**Decision.** A figure whose range the vendor did not explain is **absent**, and the published span goes in `note`.
+
+Absent means UNKNOWN, which is precisely the state: nobody knows what those ends mean. `torqueRange` continues to mean what ADR-0021 said it means, and stays available for the case it was written for.
+
+**With teeth, because option 2 was the real risk.** `how_determined` is now refused when it *states nothing* — `unknown`, `not stated`, `n/a`, `none`, `tbd`, `vendor does not say`, a bare `?`. The pattern anchors to the whole string, so *"unknown provenance but measured on a bench rig"* is a method and passes. This mirrors the rule-of-thumb refusal ADR-0004 put on the same field: both catch a required field satisfied without being answered.
+
+**Consequences.** `bldc` leaves the known-gap list, exercised by a fixture whose torque fields are all null — every empty one a fact about the datasheet rather than about the schema. A BLDC published with a single rated torque at a stated current records today, unchanged.
+
+**And a finding about this repo's own new tooling, which is the part worth carrying forward.** The gap list's *reasons are prose, and neither staleness guard checks them.* Both ask whether a type is exercised; neither can ask whether the stated reason is true. `bldc` sat there for an afternoon labelled a schema gap when it was not one, and every check in that file passed the whole time.
+
+That is not a defect to fix — a test that verified prose would be a test that verified nothing. It is a limit to state where the list lives, so the next reader treats those entries as claims to re-read rather than conclusions to trust. The comment above `ACTUATOR_GAPS` now says so.

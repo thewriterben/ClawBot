@@ -53,6 +53,22 @@ RULE_OF_THUMB = re.compile(
     re.IGNORECASE,
 )
 
+# A how_determined that says nothing (ADR-0026). The field exists to hold the
+# vendor's method, and a required field can always be satisfied with a word --
+# so "unknown" passes a presence check while carrying exactly the information
+# that would have been carried by leaving the whole record out.
+#
+# The case this was written for: iPower publishes the GM4108H-120T's load torque
+# as "1200-1800" g-cm and never says what the two ends mean. Storing that in a
+# torqueRange, whose own description asserts unit-to-unit variation, would make
+# the schema claim something the source does not -- and "not stated" in
+# how_determined would be the fig leaf that let it through.
+NON_STATEMENT = re.compile(
+    r"^\W*(unknown|unspecified|n/?a|none|not\s+(stated|given|specified|published|"
+    r"documented|available)|no\s+method|vendor\s+does\s+not\s+say|tbd|\?+)\W*$",
+    re.IGNORECASE,
+)
+
 
 class Report:
     """Failures block; warnings are findings a human should look at."""
@@ -511,8 +527,18 @@ def check_actuator(path: Path, report: Report) -> str | None:
                 f"If the vendor really publishes one figure, say so in how_determined "
                 f"— unit-to-unit variation is the reason this field is a range "
                 f"(ADR-0021)")
-        if not (rng.get("how_determined") or "").strip():
+        how_rng = (rng.get("how_determined") or "").strip()
+        if not how_rng:
             report.fail(where, f"gearbox.{field} has no how_determined")
+        elif NON_STATEMENT.match(how_rng):
+            report.fail(
+                where,
+                f"gearbox.{field} has a how_determined that states nothing "
+                f"({how_rng!r}). A range is stored rather than collapsed because the "
+                f"vendor explained its ends; where they did not, the figure is ABSENT "
+                f"and the published span goes in note. Absent says 'nobody knows what "
+                f"these ends mean', which is true. This field says 'they were "
+                f"explained', which would not be (ADR-0021, ADR-0026)")
 
     if gearbox.get("spread_pct") is not None and gearbox.get("basis") is None:
         report.warn(where, "gearbox.spread_pct is declared with no basis — a spread is a "
