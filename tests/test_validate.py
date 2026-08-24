@@ -465,6 +465,53 @@ def test_a_range_still_needs_some_how_determined():
     del doc["gearbox"]["starting_torque_nm"]["how_determined"]
     assert refuses(run("actuator", doc), "has no how_determined")
 
+
+# ------------------------------------- ADR-0027: a ceiling refuses, it never sizes
+
+def _with_limit(**over):
+    limit = {"continuous_nm": 0.392266, "intermittent_nm": 0.784532,
+             "how_determined": "vendor family page, kg-cm converted", "source": SRC}
+    limit.update(over)
+    return {"schema_version": 0, "actuator_id": "a", "type": "dc-gearmotor",
+            "source": SRC,
+            "gearbox": {"ratio": 34, "torque_limit": limit, "source": SRC}}
+
+
+def test_a_ceiling_alone_leaves_capacity_underivable():
+    """The Pololu case. Knowing what NOT to exceed is not knowing what is
+    deliverable, so the ceiling buys a refusal and never a capacity."""
+    report = run("actuator", _with_limit())
+    assert report.failures == []
+    assert warns(report, "sound refusal")
+
+
+def test_a_continuous_torque_above_the_ceiling_is_refused():
+    """The cross-check that makes the field earn its place today."""
+    doc = _with_limit()
+    doc["continuous_torque_nm"] = [{"value": 0.5, "at_volts": 12.0,
+                                    "how_determined": "measured, held 30 min",
+                                    "source": SRC}]
+    assert refuses(run("actuator", doc), "above the gearbox's continuous ceiling")
+
+
+def test_a_continuous_torque_below_the_ceiling_is_accepted():
+    doc = _with_limit()
+    doc["continuous_torque_nm"] = [{"value": 0.3, "at_volts": 12.0,
+                                    "how_determined": "measured, held 30 min",
+                                    "source": SRC}]
+    assert not refuses(run("actuator", doc), "continuous ceiling")
+
+
+def test_an_intermittent_limit_below_the_continuous_one_is_refused():
+    assert refuses(run("actuator", _with_limit(intermittent_nm=0.2)),
+                   "is not an intermittent limit")
+
+
+def test_a_ceiling_needs_a_how_determined_that_says_something():
+    """ADR-0026 applied to the new field, so the same fig leaf cannot be used."""
+    assert refuses(run("actuator", _with_limit(how_determined="not stated")),
+                   "states nothing")
+
 # ------------------------------------------------------------ ADR-0011: assemblies
 
 def test_assembly_dependency_cycle_is_refused():

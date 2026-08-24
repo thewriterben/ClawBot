@@ -1440,3 +1440,43 @@ Absent means UNKNOWN, which is precisely the state: nobody knows what those ends
 **And a finding about this repo's own new tooling, which is the part worth carrying forward.** The gap list's *reasons are prose, and neither staleness guard checks them.* Both ask whether a type is exercised; neither can ask whether the stated reason is true. `bldc` sat there for an afternoon labelled a schema gap when it was not one, and every check in that file passed the whole time.
 
 That is not a defect to fix — a test that verified prose would be a test that verified nothing. It is a limit to state where the list lives, so the next reader treats those entries as claims to re-read rather than conclusions to trust. The comment above `ACTUATOR_GAPS` now says so.
+
+---
+
+## ADR-0027 - A gearbox ceiling refuses; it never sizes
+
+**Date:** 2026-08-23
+**Status:** accepted
+
+**Context.** Pololu publishes, for the 25D gearmotor family, *"the recommended upper limit for continuously applied loads is 4 kg-cm (55 oz-in)"* and *"the recommended upper limit for intermittently permissible torque is 8 kg-cm (110 oz-in)"*. The coverage sweep flagged this as having no home, and unlike the `bldc` entry beside it **that reason survived checking**.
+
+**The figure does not move with ratio or power tier.** It is identical across the LP, MP and HP variants and at every gear ratio in the family. A motor thermal rating would vary with both, so this describes the **geartrain**.
+
+**Why `continuous_torque_nm` is the wrong home, which is the substance here.** That field means *torque the actuator can sustain*. Pololu's figure says *do not exceed*. Those are different claims, and the difference is not pedantic:
+
+> At 9.7:1 the motor stalls at **3.9 kg-cm** while the ceiling is **4 kg-cm**. Treating the ceiling as a capacity would promise a torque the motor cannot produce at all.
+
+So a ceiling can sit above what is achievable, below it, or anywhere between, and nothing about the number tells you which. It is a bound on the *question*, not an answer to it.
+
+**Options considered.**
+
+1. *Write it into `continuous_torque_nm`.* Rejected on the above, and the schema half-knew already: `continuous_torque_nm` requires `at_volts` while this figure is voltage-independent, and the existing continuous-below-stall check would have refused it at 9.7:1 for the right reason with the wrong message.
+2. *Record it as absent, with the span in `note`* - the ADR-0026 treatment. Rejected. That answer fits a figure whose **meaning** is unknown. This figure's meaning is stated plainly; it is only the *use* that differs from any existing field.
+3. *Derate it into a capacity by some margin.* Rejected for the reason ADR-0004 refuses fractions of stall.
+4. *A ceiling field that can refuse and cannot size.* Accepted.
+
+**Decision.** `gearbox.torque_limit` = `{continuous_nm, intermittent_nm?, how_determined, source?}`.
+
+- It is **a ceiling, never a capacity**. No derivation may turn it into one.
+- `intermittent_nm` must not sit below `continuous_nm`.
+- `how_determined` is required, and one that states nothing is refused (ADR-0026 applies here from the day the field exists).
+- **The cross-check that makes it earn its place today:** a `continuous_torque_nm` above the ceiling is refused. The vendor said do not exceed it; recording a sustained torque above it claims the geartrain tolerates what its maker said it should not.
+- Where a ceiling is present and `continuous_torque_nm` is not, that is reported: capacity remains underivable, but a required torque *above* the ceiling is a **sound refusal**.
+
+**That asymmetry is the point.** ADR-0015 rests on it already - sampled reach is sound positive, static capacity sound negative, and no combination yields a provable yes. A ceiling is the purest instance yet: it can only ever say no.
+
+**Not consumed by a derivation, and the reason is not laziness.** `hold` raises `incomplete` on a missing continuous rating *before any load is computed*, so consuming the ceiling means restructuring that path - and no robot in `data/` uses a geared actuator with a limit, so the change would ship untested against real data. The validator reads the field today; `hold` reading it is the obvious next step and wants a robot that exercises it.
+
+**Consequences.** The 25D fixture stops complaining in prose about a figure with nowhere to go. `continuous_torque_nm` there is still null and capacity still underivable, because the real continuous torque is `min(gearbox ceiling, unpublished thermal limit)` and only one of those is known - which the record now says in fields rather than in a note.
+
+`dc-gearmotor` was the last entry on the coverage sweep's gap list. It is empty.
