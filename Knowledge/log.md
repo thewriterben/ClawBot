@@ -1049,3 +1049,35 @@ the list lives**, so the next reader treats those entries as claims to re-read r
 conclusions to trust. The comment above `ACTUATOR_GAPS` now says so. A tool built this morning to
 catch bad reasoning produced some of its own by lunchtime, which is worth knowing about every tool
 of this kind.
+
+## [2026-08-23] decision | The last gap, and this time the stated reason held
+
+Source: Pololu 25D Metal Gearmotors family page. -> ADR-0027, [[open-questions]]
+
+After [[open-questions]]'s `bldc` entry turned out to carry a wrong reason, the `dc-gearmotor`
+entry beside it was re-read rather than trusted. **It held.** Pololu does publish a figure with
+nowhere to go: *"the recommended upper limit for continuously applied loads is 4 kg-cm"*, plus an
+intermittent limit of 8 kg-cm.
+
+**What settled that it belongs to the geartrain:** the figure is identical across the LP, MP and
+HP variants and at every ratio in the family. A motor thermal rating would move with both.
+
+**And what settled that it is not a capacity** is the other end of the same family. At 9.7:1 the
+motor stalls at 3.9 kg-cm while the ceiling is 4 kg-cm - so treating the ceiling as a capacity
+would promise a torque that motor cannot produce at all. *Do not exceed X* and *can sustain X* are
+different claims, and a ceiling can sit above what is achievable, below it, or anywhere between,
+with nothing in the number to say which.
+
+So `gearbox.torque_limit` refuses and never sizes. That makes it the purest instance of the
+asymmetry ADR-0015 already rests on: sampled reach is sound positive, static capacity sound
+negative, and this field can **only ever say no**.
+
+The record for that gearmotor still has `continuous_torque_nm: null`. The real continuous torque is
+`min(ceiling, unpublished thermal limit)` and only one of those is known - now said in fields
+rather than in a note.
+
+**The sweep's list is empty.** Six actuator types, all exercised. Of the three gaps it declared this
+afternoon, one was real and fixed ([[stepper-torque-index]] had already closed a fourth), one was a
+mislabelled datasheet problem, and one was a reason that turned out to be wrong. **Two of three
+entries needed correcting** - which is the rate to expect from a list whose reasons nothing checks,
+and worth remembering the next time one reads convincingly.

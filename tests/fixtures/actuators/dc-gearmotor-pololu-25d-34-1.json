@@ -45,6 +45,16 @@
 
   "gearbox": {
     "ratio": 34,
+    "torque_limit": {
+      "continuous_nm": 0.392266,
+      "intermittent_nm": 0.784532,
+      "how_determined": "Pololu, 25D family: 'the recommended upper limit for continuously applied loads is 4 kg-cm (55 oz-in)' and 'the recommended upper limit for intermittently permissible torque is 8 kg-cm (110 oz-in)'. Published in kg-cm and converted at 1 kgf-cm = 0.0980665 N-m exactly. Recorded as a GEARBOX property because the figures are identical at every ratio and every power tier in the family, which a motor thermal rating would not be.",
+      "source": {
+        "citation": "Pololu 25D Metal Gearmotors category page, applying to the whole family.",
+        "url": "https://www.pololu.com/category/115/25d-metal-gearmotors",
+        "retrieved": "2026-08-23"
+      }
+    },
     "source": {
       "citation": "Published as '34:1'. Recorded as the nominal published ratio; Pololu documents exact ratios for some gearboxes in its datasheet, which was not read here.",
       "url": "https://www.pololu.com/category/115/25d-metal-gearmotors",
@@ -69,5 +79,5 @@
     "retrieved": "2026-08-23"
   },
 
-  "note": "THE GAP THIS FIXTURE EXISTS TO EXPOSE. Pololu publishes, for the 25D family: 'the recommended upper limit for continuously applied loads is 4 kg-cm (55 oz-in)', with an intermittent limit of 8 kg-cm. That is a GEARBOX limit - a property of the geartrain, not a thermal rating of the motor - and 4 kg-cm is 0.392266 N-m.\n\nAt this 34:1 ratio the motor stalls at 4.7 kg-cm, ABOVE the gearbox's 4 kg-cm limit. So the binding constraint on what this actuator may be asked to hold is the gearbox, and there is no field for it: `gearbox` carries ratio, type, backlash_rad, measured_efficiency, starting_torque_nm, backdriving_torque_nm, basis and spread_pct, and no torque limit.\n\nIt must NOT be written into continuous_torque_nm. That field means torque the actuator can sustain, and this figure says nothing about the motor's thermal behaviour - at a low enough ratio the gearbox limit is not binding at all and the motor's own heating decides. Two different quantities, and conflating them is the ADR-0004 failure in a new costume.\n\nSo continuous_torque_nm stays null and capacity stays underivable, while a published, useful, binding number sits in this note because nothing can hold it. Recorded as an open question rather than fixed here."
+  "note": "THE GAP THIS FIXTURE EXPOSED, NOW CLOSED BY ADR-0027. The 4 kg-cm figure lives in gearbox.torque_limit and no longer sits in this note for want of a field.\n\nWHY IT IS A CEILING AND NOT A CAPACITY, which is the whole of ADR-0027. Pololu says 'do not exceed'; continuous_torque_nm means 'can sustain'. Different claims. The proof is at the other end of the family: the 9.7:1 HP variant stalls at 3.9 kg-cm while the ceiling is 4 kg-cm, so treating the ceiling as a capacity would promise a torque that motor cannot produce at all.\n\nAND THAT THE FIGURE DOES NOT MOVE is what proves it belongs to the geartrain. It is identical at every ratio and every power tier in the 25D family - a motor thermal rating would vary with both.\n\ncontinuous_torque_nm is STILL null, and capacity is still underivable, because Pololu publishes no thermal rating for the motor. The real continuous torque is min(gearbox ceiling, unpublished thermal limit) and only one of those is known. What the ceiling buys is a REFUSAL: a required torque above 0.392266 N-m is a sound no, which is the same asymmetry ADR-0015 rests on.\n\nSTILL NOT CONSUMED BY A DERIVATION. hold raises incomplete on the missing continuous rating before any load is computed, so wiring the ceiling in means restructuring that path - and no robot in data/ uses a geared actuator with a limit, so the change would ship untested against real data. The cross-check in validate.py reads the field today; hold reading it is the obvious next step."
 }
