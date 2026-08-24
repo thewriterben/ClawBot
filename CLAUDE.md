@@ -77,8 +77,8 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty-eight ADRs, seven stdlib
 scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`, `emit_rust`,
 `check_claims`), an MCP
-surface and a zero-dependency Rust binding. 191 Python tests, 37 Rust tests, all run by CI. `data/` holds two
-real actuator records and one robot record — a two-DOF pan-tilt, written BEFORE the build so
+surface and a zero-dependency Rust binding. 191 Python tests, 37 Rust tests, all run by CI. `data/` holds three
+actuator records and one robot record — a two-DOF pan-tilt, written BEFORE the build so
 `validate.py` is the checklist rather than the audit. Its structure and actuator wiring are real;
 every dimension is a `TODO(source)` placeholder and both joints have `limits: null`, so `reach`,
 `affordance` and URDF export all refuse and name the joint. That is the record working, not a

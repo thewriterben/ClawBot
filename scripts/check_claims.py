@@ -132,6 +132,14 @@ def main() -> int:
         r.claim(doc, "scripts", rf"({NUM}) (?:stdlib )?scripts", scripts)
         r.claim(doc, "records in data/", rf"holds ({NUM}) real records?",
                 robots + actuators)
+        # "two real actuator records" outlived ADR-0024 splitting the clone
+        # into its own record, and the forbid() below could not see it — a
+        # forbid pins one phrase, and the phrase had moved on. Any counted
+        # claim about actuator or robot records is now checked as a count.
+        r.claim(doc, "actuator records", rf"({NUM}) (?:real )?actuator records?",
+                actuators)
+        r.claim(doc, "robot records", rf"({NUM}) (?:real )?robot records?",
+                robots)
         if args.python_tests is not None:
             r.claim(doc, "Python tests", rf"({NUM}) Python tests", args.python_tests)
         if args.rust_tests is not None:
