@@ -1,0 +1,17 @@
+{
+  "schema_version": 0,
+  "actuator_id": "mg90s-clone-unbranded",
+  "type": "hobby-servo",
+
+  "stall_torque_nm": null,
+  "continuous_torque_nm": null,
+  "no_load_speed_rad_s": null,
+  "travel": null,
+
+  "source": {
+    "citation": "An unbranded servo in the owner's possession. The case is marked 'MG90S' and 'Micro servo' and carries NO manufacturer mark. Physical dimensions were measured with a digital caliper on 2026-08-23 (see note). No datasheet exists for this part, none is claimed, and none of TowerPro's published figures are carried over.",
+    "retrieved": "2026-08-23"
+  },
+
+  "note": "THIS RECORD HAS NO TORQUE FIGURE OF ANY KIND, AND THAT IS THE POINT.\n\nThe servos going into robot 'pan-tilt-mg90s' are unbranded clones, not TowerPro units. `towerpro-mg90s` is a correct record of TowerPro's published figures and it describes a DIFFERENT PRODUCT. Borrowing its 1.8/2.2 kgf-cm would be inventing physical data with a citation attached, which is the one thing this repo refuses (ADR-0024).\n\nNote that ADR-0018's `basis` cannot express this. That field separates a population average from the unit on your bench WITHIN one product line - Harmonic Drive's +/-30% case. An unbranded clone is not a unit of TowerPro's population at all, so there is no population for it to be typical of. Hence a separate record rather than an annotation.\n\nWHAT IS ACTUALLY KNOWN, all measured, all this-unit:\n\n  body                 23 x 12 x 17 mm (length x width x height below flange)\n  mounting flange      2.3 mm thick, 32.24 mm overall\n  flange top to spline 7 mm\n  hole centres         27 mm apart\n  shaft axis           8 mm from the top hole centre, centred across the 12 mm width\n\nMethod, and it governs every figure above: digital caliper, reported to 0.01 mm where the fractional part exceeded 0.10 mm and otherwise rounded to the nearest millimetre - so a whole-millimetre value denotes a reading within +/-0.10 mm of it, not +/-0.5 mm. The 26.3 mm total height is a SUM of three roundings and carries roughly +/-0.3 mm; measure it directly if a fit depends on it.\n\nThose dimensions live here as prose because the actuator schema has no dimension fields, by design. Where they DO enter a computation is the robot record: they set the link size_mm boxes and the joint origins, which is where hardware geometry belongs.\n\nTHE MEASUREMENT THAT SETTLED THE IDENTITY QUESTION: 26.3 mm total height matches neither of TowerPro's own published figures (28.5 mm on the product page, 35.5 mm in the datasheet PDF). The two TowerPro documents already disagreed with each other by 7 mm; this unit agrees with neither.\n\nWHAT WOULD CLOSE THE TORQUE GAP: measuring it. A stall figure from a lever arm and a scale, with the method written into how_determined, is admissible evidence about THIS unit and is worth more here than any datasheet, because no datasheet describes this part. Until then capacity is underivable - not because a vendor published only stall, but because there is no vendor."
+}

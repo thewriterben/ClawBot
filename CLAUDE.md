@@ -39,6 +39,7 @@ These are decided. If a change would introduce one, it needs a superseding ADR, 
 | A scalar `gearbox.efficiency` | Efficiency varies with input speed, ratio, load, temperature and lubricant — eight curves, no scalar | ADR-0018 |
 | A running efficiency applied to a static hold | Efficiency curves are indexed by input speed; a held pose has none. Wrong in kind, not in value | ADR-0018 |
 | Treating a catalogue figure as a fact about your unit | A vendor may be publishing a population average — ±30% unit-to-unit is stated in one datasheet | ADR-0018 |
+| Borrowing a branded part's figures for an unbranded clone | `basis` separates a population from a member; a clone is not a member of it, so there is no population it is typical of | ADR-0024 |
 | A stepper's torque indexed by voltage | The published "rated voltage" is rated current times phase resistance — 2.0 A × 1.4 Ω = 2.8 V — not the supply it runs on | ADR-0023 |
 | An `at_volts` on a current-indexed torque row | It would make one field name mean two different quantities across two actuator types | ADR-0023 |
 | A scalar starting or backdriving torque | Published as ranges spanning an order of magnitude, varying unit to unit | ADR-0021 |
@@ -68,9 +69,9 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 
 ## Status
 
-Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty-three ADRs, six stdlib
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty-four ADRs, six stdlib
 scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`, `emit_rust`), an MCP
-surface and a zero-dependency Rust binding. 160 Python tests, 36 Rust tests, all run by CI. `data/` holds two
+surface and a zero-dependency Rust binding. 162 Python tests, 36 Rust tests, all run by CI. `data/` holds two
 real actuator records and one robot record — a two-DOF pan-tilt, written BEFORE the build so
 `validate.py` is the checklist rather than the audit. Its structure and actuator wiring are real;
 every dimension is a `TODO(source)` placeholder and both joints have `limits: null`, so `reach`,

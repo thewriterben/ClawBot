@@ -350,6 +350,29 @@ def test_holding_torque_alone_leaves_capacity_underivable():
     assert report.failures == []
     assert warns(report, "capacity is underivable")
 
+
+# ------------------------------------------------- ADR-0024: a part with no datasheet
+
+def test_an_actuator_with_no_torque_at_all_is_valid_and_says_so():
+    """The unbranded-clone case. Legal, because a part no datasheet describes is a
+    real thing to own; reported on every run, because silence would let it pass as
+    an ordinary record."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
+           "stall_torque_nm": None, "continuous_torque_nm": None}
+    report = run("actuator", doc)
+    assert report.failures == []
+    assert warns(report, "no torque figure of any kind")
+
+
+def test_having_any_torque_figure_silences_that_warning():
+    """Guards the condition itself: the warning must key on all three fields being
+    absent, not on continuous alone, or every stall-only record would trip it."""
+    doc = {"schema_version": 0, "actuator_id": "a", "type": "hobby-servo", "source": SRC,
+           "stall_torque_nm": [{"value": 2.0, "at_volts": 6.0, "source": SRC}]}
+    report = run("actuator", doc)
+    assert not warns(report, "no torque figure of any kind")
+    assert warns(report, "capacity is underivable")
+
 # ------------------------------------------------------------ ADR-0011: assemblies
 
 def test_assembly_dependency_cycle_is_refused():

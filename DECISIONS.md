@@ -1316,3 +1316,41 @@ That is not a claim that holding torque is unsustainable. It is a record that **
 **Consequences.** A stepper or BLDC can now be recorded without inventing anything. Six tests cover the index, the duplicate, the refused voltage, both wrong-field warnings, and the underivable-capacity outcome. The binding gains `HoldingTorque` and `Actuator::holding_torque`, empty for every servo — and empty is not zero.
 
 This is the third field to arrive this way, after ADR-0014 (voltage) and ADR-0018 (efficiency). All three came from one datasheet meeting one schema field, which is the mechanism `Knowledge/concepts/open-questions.md` predicted would keep producing them: *"not from thinking harder, but from one datasheet meeting one schema field."*
+
+---
+
+## ADR-0024 — An unbranded equivalent is a different actuator, not a basis annotation on the branded one
+
+**Date:** 2026-08-23
+**Status:** accepted
+
+**Context.** `data/actuators/towerpro-mg90s.json` was written from TowerPro's own documents and its `note` closed with a warning: the MG90S is heavily cloned, those figures describe TowerPro's population, and *"if the unit on the bench is not a verified TowerPro, this record is cited for the wrong thing."*
+
+It is not. The servos going into `pan-tilt-mg90s` are unbranded — case marked `MG90S` and `Micro servo`, no manufacturer mark anywhere. The measurement had already hinted at it: a total height of 26.3 mm matches neither of TowerPro's own published figures, 28.5 mm on the product page or 35.5 mm in the datasheet PDF. Two documents that disagreed with each other by 7 mm, and the part in hand agreeing with neither.
+
+So a robot record was citing, for its torque, a document about a product it does not contain.
+
+**Why ADR-0018's `basis` does not cover this — the substance of the decision.** `basis` marks a value as `model-typical` or `this-unit`. It exists because Harmonic Drive states that its published stiffness is *"the average of many tests of actual units"* and an individual may sit ±30% off it. That is a **population-versus-member** distinction, and it presumes the member is drawn from the population.
+
+An unbranded clone is not a member. There is no population it is typical of. Marking TowerPro's 1.8 kgf·cm as `model-typical` and using it anyway would assert that the part is a sample from TowerPro's line, which is precisely what is not known — and would be worse than an uncited number, because it would look like careful practice.
+
+**Options considered.**
+
+1. *Keep citing the TowerPro record and note the doubt in prose.* Rejected. A note does not travel into a derivation. `hold` would read a torque that describes another product and return a figure with units and a citation, which is the most dangerous shape a wrong number can take.
+2. *Add a `basis: "unknown-population"` or similar.* Rejected. It stretches a field with a clear, sourced meaning to cover a different failure, and it would let a clone keep borrowing figures so long as it confessed. The problem is not the confidence attached to the number; the number is about something else.
+3. *Derate the branded figures by some margin.* Rejected on the same grounds as the 30–50%-of-stall rule ADR-0004 refuses. A margin applied to a figure about a different product does not make it a figure about this one.
+4. *A separate record carrying only what is known about the actual part.* Accepted.
+
+**Decision.** An actuator whose manufacturer cannot be established gets **its own record**, and **no figure is carried over** from a branded part of the same form factor.
+
+`mg90s-clone-unbranded` therefore has `stall_torque_nm: null`, `continuous_torque_nm: null`, `no_load_speed_rad_s: null` and `travel: null`. What it does carry is the measured geometry, as prose with its method, and an identity statement saying what the case is marked with and what it is not.
+
+The branded record stays. It is a correct account of TowerPro's published figures — including the 7 mm disagreement between their two documents — and it now names the clone record so a reader cannot mistake one for the other.
+
+`validate.py` reports an actuator with no torque figure of any kind, on every run, so the state is visible rather than silent.
+
+**Consequences.** The pan-tilt's capacity is underivable for a **stronger reason than usual**: not that a vendor published only stall, but that there is no vendor. Reach is unaffected — geometry was measured, and measurement is the better source anyway.
+
+This is the first record in `data/` whose evidence is a caliper rather than a document, and it is *better* evidence than the branded record it replaced. A measurement of the object in hand outranks a datasheet about a different object, which is worth saying plainly because this platform's discipline is usually read as "prefer the published figure."
+
+**What closes the gap:** measuring the stall torque with a lever arm and a scale, with the method written into `how_determined`. That is admissible evidence about this unit and worth more here than any datasheet, because no datasheet describes this part. Until then, `hold` answers `incomplete` and names the joint.
