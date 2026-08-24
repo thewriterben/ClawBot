@@ -1015,3 +1015,37 @@ written down. After it, the headline can, and what cannot is named in a fixture 
 person will find it. Difference in kind, not degree — the same place ADR-0023 stopped. Modelling all
 five figures would have meant deciding the rotary counterparts of two of them in the same afternoon,
 asymmetrically, which is how a schema acquires a lopsided half.
+
+## [2026-08-23] decision | The sweep's own entry was wrong, and nothing could have caught it
+
+Source: iPower GM4108H-120T specification table, read verbatim from the vendor listing.
+-> ADR-0026, [[open-questions]]
+
+The coverage sweep declared `bldc` a schema gap. **It was not one.** ADR-0023's
+`holding_torque_nm` had accepted a current-indexed torque all along and names `bldc` explicitly.
+The unrecordable thing was one vendor's figure, not the type.
+
+**What the vendor actually publishes:** *"Load torque(g-cm): 1200-1800"* at *"Load current: 1.5A"*,
+and no statement anywhere of what the two ends mean. Storing that in ADR-0021's `torqueRange` --
+whose description reads *"varies UNIT TO UNIT rather than over an operating envelope"* -- would make
+the schema assert something the source never claimed.
+
+**The notation is the only evidence, and it is not pushed further than it goes.** One page uses
+`124+/-0.5g` and `11.1 ohm +/-5%` for tolerances, `513~567` for a speed span, and a plain hyphen for
+the torque. None is explained. A vendor who has a tolerance notation and did not use it here is not
+obviously stating a tolerance -- enough to refuse a collapse, not enough to say what the range is.
+
+So the figure is **absent**, with the span in `note`. Absent means UNKNOWN, which is exactly the
+state. And `how_determined` is now refused when it states nothing -- `unknown`, `not stated`, `n/a`,
+`tbd` -- because that was the tempting way through: a required field can always be satisfied with a
+word, and the record would then *look* explained.
+
+**The finding worth carrying forward is about the sweep itself.** Its gap list's reasons are prose,
+and both staleness guards ask only whether a type is exercised -- never whether the stated reason is
+true. `bldc` sat there for an afternoon carrying a wrong reason while every check in the file passed.
+
+That is not fixable: a test that verified prose would verify nothing. It is a **limit to state where
+the list lives**, so the next reader treats those entries as claims to re-read rather than
+conclusions to trust. The comment above `ACTUATOR_GAPS` now says so. A tool built this morning to
+catch bad reasoning produced some of its own by lunchtime, which is worth knowing about every tool
+of this kind.

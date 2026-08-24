@@ -1,0 +1,44 @@
+{
+  "_fixture": [
+    "NOT OWNED HARDWARE. Exercises the bldc type, and corrects a mistake this repo",
+    "made about it earlier the same day.",
+    "",
+    "The coverage sweep declared `bldc` a SCHEMA GAP. It is not. ADR-0023's",
+    "holding_torque_nm already accepts a current-indexed torque and names bldc",
+    "explicitly. What is unrecordable is not the type - it is THIS PART's headline",
+    "figure, which the vendor publishes as an unexplained range (ADR-0026).",
+    "",
+    "So the record is thin, and every empty field is a fact about the datasheet."
+  ],
+
+  "schema_version": 0,
+  "actuator_id": "fixture-ipower-gm4108h-120t",
+  "make": "iPower",
+  "model": "GM4108H-120T",
+  "type": "bldc",
+
+  "holding_torque_nm": null,
+  "stall_torque_nm": null,
+  "continuous_torque_nm": null,
+  "no_load_speed_rad_s": null,
+
+  "mass_g": 124,
+
+  "electrical": {
+    "nominal_volts": 20.0,
+    "no_load_current_a": 0.07,
+    "source": {
+      "citation": "iFlight/iPower GM4108H-120T specification table: 'Load volts: 20V', 'No-load volts: 20V', 'No-load current: 0.07±0.1A'. NOTE the stated tolerance is LARGER THAN THE VALUE - 0.07 plus or minus 0.1 admits a negative current - so the tolerance is recorded here in prose and not treated as a spread. Motor internal resistance is published as 11.1 ohm +/-5%.",
+      "url": "https://iflight-rc.eu/en/products/ipower-gm4108h-120t-gimbal-motor",
+      "retrieved": "2026-08-23"
+    }
+  },
+
+  "source": {
+    "citation": "iPower GM4108H-120T brushless gimbal motor, 24N/22P, 8 mm hollow shaft. Specification table read verbatim 2026-08-23 from the vendor listing while sweeping the actuator type enum.",
+    "url": "https://iflight-rc.eu/en/products/ipower-gm4108h-120t-gimbal-motor",
+    "retrieved": "2026-08-23"
+  },
+
+  "note": "WHY EVERY TORQUE FIELD IS NULL. The vendor publishes 'Load torque(g-cm): 1200-1800' at 'Load current: 1.5A' and 'Load volts: 20V', and says NOTHING about what the two ends of that range mean. ADR-0026 refuses to store it: torqueRange asserts unit-to-unit variation, holding_torque_nm takes a single value, and collapsing 1200-1800 to either end or to a midpoint invents a claim the source does not make. Absent says 'nobody knows what these ends mean', which is true.\n\nno_load_speed_rad_s is null for the same reason: the vendor publishes 'No-load Rpm: 513~567', another unexplained span.\n\nTHE NOTATION IS THE EVIDENCE. This one page uses three different notations - '124±0.5g' and '11.1Ω±5%' and '0.07±0.1A' for tolerances, '513~567' for the speed span, and a plain hyphen for '1200-1800' - and explains none of them. A vendor with a tolerance notation who did not use it here is not obviously stating a tolerance, and that is as far as the evidence goes. It is enough to refuse a collapse and not enough to say what the range is.\n\nAnd the no-load current tolerance is wider than the no-load current, which is a good reason to read the rest of this table carefully.\n\nWHAT WOULD MAKE A BLDC FULLY RECORDABLE: a vendor publishing a single rated torque at a stated current. That fits holding_torque_nm today, unchanged. The type is not the problem."
+}

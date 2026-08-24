@@ -40,6 +40,8 @@ These are decided. If a change would introduce one, it needs a superseding ADR, 
 | A running efficiency applied to a static hold | Efficiency curves are indexed by input speed; a held pose has none. Wrong in kind, not in value | ADR-0018 |
 | Treating a catalogue figure as a fact about your unit | A vendor may be publishing a population average — ±30% unit-to-unit is stated in one datasheet | ADR-0018 |
 | Borrowing a branded part's figures for an unbranded clone | `basis` separates a population from a member; a clone is not a member of it, so there is no population it is typical of | ADR-0024 |
+| Storing a range whose ends the vendor never explained | `torqueRange` asserts unit-to-unit variation; a source that says nothing has not claimed that, and absent means UNKNOWN | ADR-0026 |
+| A `how_determined` that states nothing | A required field can always be satisfied with a word, and the record then *looks* explained | ADR-0026 |
 | A force written into a torque field | Newtons are not newton-metres; a linear actuator's output is a force, and a unit error is refused rather than reported | ADR-0025 |
 | A stepper's torque indexed by voltage | The published "rated voltage" is rated current times phase resistance — 2.0 A × 1.4 Ω = 2.8 V — not the supply it runs on | ADR-0023 |
 | An `at_volts` on a current-indexed torque row | It would make one field name mean two different quantities across two actuator types | ADR-0023 |
@@ -70,10 +72,10 @@ Say so, and say which input is missing. "Incomplete: joint `shoulder_pitch` has 
 
 ## Status
 
-Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty-five ADRs, seven stdlib
+Pre-alpha. Four schemas (`robot`, `actuator`, `assembly`, `harness`), twenty-six ADRs, seven stdlib
 scripts (`validate`, `kinematics`, `affordance`, `manifest`, `urdf`, `emit_rust`,
 `check_claims`), an MCP
-surface and a zero-dependency Rust binding. 176 Python tests, 37 Rust tests, all run by CI. `data/` holds two
+surface and a zero-dependency Rust binding. 180 Python tests, 37 Rust tests, all run by CI. `data/` holds two
 real actuator records and one robot record — a two-DOF pan-tilt, written BEFORE the build so
 `validate.py` is the checklist rather than the audit. Its structure and actuator wiring are real;
 every dimension is a `TODO(source)` placeholder and both joints have `limits: null`, so `reach`,

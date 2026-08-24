@@ -431,6 +431,40 @@ def test_a_force_figure_silences_the_nothing_at_all_warning():
     assert not warns(report, "no torque or force figure of any kind")
     assert warns(report, "capacity is underivable")
 
+
+# --------------------------------------- ADR-0026: a how_determined that says nothing
+
+def _with_range(how):
+    return {"schema_version": 0, "actuator_id": "a", "type": "smart-servo", "source": SRC,
+            "gearbox": {"ratio": 100,
+                        "starting_torque_nm": {"min": 0.03, "max": 0.5,
+                                               "how_determined": how, "source": SRC},
+                        "source": SRC}}
+
+
+def test_a_how_determined_that_states_nothing_is_refused():
+    """The tempting way to launder an unexplained range: a required field can
+    always be satisfied with a word, and the record then LOOKS explained."""
+    for empty in ("unknown", "not stated", "N/A", "none", "TBD", "?",
+                  "vendor does not say"):
+        report = run("actuator", _with_range(empty))
+        assert refuses(report, "states nothing"), f"{empty!r} was accepted"
+
+
+def test_a_real_method_containing_the_word_unknown_is_accepted():
+    """The pattern anchors to the whole string. A method is a method even when it
+    admits uncertainty, and refusing that would push authors toward vaguer prose."""
+    report = run("actuator", _with_range(
+        "unknown provenance, but measured on a bench rig at 20 C"))
+    assert not refuses(report, "states nothing")
+
+
+def test_a_range_still_needs_some_how_determined():
+    """ADR-0021's original rule, unchanged by ADR-0026."""
+    doc = _with_range("x")
+    del doc["gearbox"]["starting_torque_nm"]["how_determined"]
+    assert refuses(run("actuator", doc), "has no how_determined")
+
 # ------------------------------------------------------------ ADR-0011: assemblies
 
 def test_assembly_dependency_cycle_is_refused():

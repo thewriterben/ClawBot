@@ -46,17 +46,16 @@ def _enum(schema: str, *path: str) -> set[str]:
     return set(node["enum"])
 
 
-# Why each unexercised value is unexercised. A reason, not an excuse: three of
-# these are gaps in the schema rather than gaps in the shelf, and saying so is
-# the whole reason this file exists.
+# Why each unexercised value is unexercised. A reason, not an excuse.
+#
+# WORTH KNOWING BEFORE YOU TRUST AN ENTRY HERE: these reasons are prose, and the
+# two staleness guards below check only whether a type is exercised — never
+# whether the stated reason is *true*. `bldc` sat here for an afternoon labelled
+# a schema gap when it was not one: ADR-0023's `holding_torque_nm` had accepted a
+# current-indexed BLDC torque all along, and the unrecordable thing was one
+# vendor's unexplained range (ADR-0026). A wrong reason survives every check in
+# this file. Re-read them, do not audit them.
 ACTUATOR_GAPS = {
-    "bldc":
-        "SCHEMA GAP. The iPower GM4108H-120T publishes 'load torque 1200-1800 "
-        "g-cm' at 1.5 A — a RANGE, indexed by current. `torqueAtVolts` takes a "
-        "single value with a voltage and `torqueAtAmps` a single value with a "
-        "current; neither takes a range. ADR-0021 already established that some "
-        "torques are published as ranges, for starting and backdriving torque. "
-        "This is the same shape arriving on a different field.",
 }
 
 JOINT_GAPS = {
